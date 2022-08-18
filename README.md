@@ -15,8 +15,8 @@ export const createProject = createMethod({
     description: z.string().optional(),
     isPublic: z.boolean(),
   }),
-  run({ name, description, isPublic }) {
-    Projects.insert({
+  run({ name, description, isPublic }): string {
+    let id = Projects.insert({
       name,
 
       // Type 'string | undefined' is not assignable to type 'string'.
@@ -24,6 +24,8 @@ export const createProject = createMethod({
       description,
       public: isPublic,
     });
+
+    return id;
   },
 });
 
@@ -33,8 +35,9 @@ export const createProject = createMethod({
 ```ts
 import { createProject } from '/imports/methods/projects';
 
-export function createExampleProject() {
-  return createProject({
+export async function createExampleProject() {
+  // id has type of string
+  const id = await createProject({
     // Property 'isPublic' is missing in type '{ name: string; }'
     // but required in type
     // '{ description?: string | undefined; name: string; isPublic: boolean; }'.ts(2345)
@@ -77,7 +80,7 @@ If you haven't already, add [`zodern:types`](https://atmospherejs.com/zodern/typ
 
 ## Methods
 
-You can define methods in files in `methods` directories. The `methods` directories should not be inside a `client` or `server` folder so you can import the methods on both the client and server. The babel plugin will remove all server code when imported on the client.
+You can define methods in files in `methods` directories. The `methods` directories should not be inside a `client` or `server` folder so you can import the methods on both the client and server. The babel plugin will remove all server code from these files when imported on the client.
 
 ```ts
 import { createMethod } from 'meteor/zodern:relay';
@@ -123,7 +126,7 @@ On the client, only `config.name` is defined.
 
 ## Publications
 
-You can define publicaitons in files in `publications` directories. The `publications` directories should not be inside a `client` or `server` folder so you can import the publications on both the client and server. The babel plugin will remove all server code when imported on the client.
+You can define publicaitons in files in `publications` directories. The `publications` directories should not be inside a `client` or `server` folder so you can import the publications on both the client and server. The babel plugin will remove all server code from these files when imported on the client.
 
 ```ts
 import { createPublication } from 'meteor/zodern:relay';
@@ -152,6 +155,15 @@ import { subscribeProject } from '/imports/publications/projects'
 
 const exampleId = 'example';
 subscribeProject({ id: exampleId });
+
+subscribeProject({ id: exampleId }, {
+  onStop(err) {
+    console.log('subscription stopped', err);
+  },
+  onReady() {
+    console.log('subscription ready');
+  }
+});
 ```
 
 Like with methods, the function returned by `createPublication` has a `config` property to access the name, schema, and run function. On the client, only the name is available.
