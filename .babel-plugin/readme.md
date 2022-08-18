@@ -14,5 +14,4 @@ Create a `.babelrc` file for your Meteor app:
     "@zodern/babel-plugin-meteor-relay"
   ]
 }
-
 ```
