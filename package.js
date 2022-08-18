@@ -1,0 +1,38 @@
+Package.describe({
+  name: 'zodern:relay',
+  version: '0.0.1',
+  // Brief, one-line summary of the package.
+  summary: '',
+  // URL to the Git repository containing the source code for this package.
+  git: '',
+  // By default, Meteor will default to using README.md for documentation.
+  // To avoid submitting documentation, set this field to null.
+  documentation: 'README.md'
+});
+
+Package.onUse(function(api) {
+  api.versionsFrom('2.7.3');
+  api.use('typescript');
+  api.use('ddp-rate-limiter');
+  api.use('zodern:types');
+  api.mainModule('server-main.ts', 'server');
+  api.mainModule('client-main.ts', 'client');
+});
+
+Package.onTest(function(api) {
+  api.use('ecmascript');
+  api.use('typescript');
+  api.use('tinytest');
+  api.use('mongo');
+  api.use('zodern:relay');
+  api.addFiles([
+    'tests/methods/index.js',
+    'tests/publications/index.js',
+  ], 'server');
+  api.addFiles([
+    'tests/method-tests.js',
+  ]);
+  api.addFiles([
+  'tests/publication-tests.js',
+  ], 'client');
+});
