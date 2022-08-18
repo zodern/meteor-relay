@@ -97,3 +97,23 @@ expectError(stringSubscribe({ a: 20 }));
 expectType<Meteor.SubscriptionHandle>(anySubscribe('123'));
 // TODO: fix this
 // expectType<Meteor.SubscriptionHandle>(anySubscribe());
+
+expectType<Meteor.SubscriptionHandle>(stringSubscribe('fun2', {
+  onStop(err: Error) {
+    console.log(err);
+  }
+}));
+
+expectType<Meteor.SubscriptionHandle>(stringSubscribe('fun3', {
+  onReady() {
+    console.log('ready');
+  }
+}));
+
+expectType<Meteor.SubscriptionHandle>(neverSubscribe({
+  onReady() {
+    console.log('ready');
+  }
+}));
+
+expectType<Meteor.SubscriptionHandle>(stringSubscribe('fun3', {}));

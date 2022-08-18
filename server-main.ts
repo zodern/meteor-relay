@@ -92,8 +92,13 @@ export function createPublication<S extends z.ZodTypeAny, T>(config: {
   }
 
 
-  function subscribe(...args: S extends z.ZodNever ? [] : [z.input<S>]): Meteor.SubscriptionHandle
-  function subscribe(args?: z.input<S>) {
+  interface Callbacks {
+    onStop?: (err?: any) => void,
+    onReady?: () => void
+  }
+
+  function subscribe(...args: S extends z.ZodNever ? [Callbacks?] : [z.input<S>, Callbacks?]): Meteor.SubscriptionHandle
+  function subscribe(args?: z.input<S> | Callbacks, callbacks?: Callbacks) {
     if (config.name === null) {
       throw new Error('Cannot directly subscribe to null publication');
     }
