@@ -11,10 +11,10 @@ Package.describe({
 });
 
 Package.onUse(function(api) {
-  api.versionsFrom('2.7.3');
+  api.versionsFrom('2.2');
   api.use('typescript');
   api.use('ddp-rate-limiter');
-  api.use('zodern:types');
+  api.use('zodern:types@1.0.9');
   api.mainModule('server-main.ts', 'server');
   api.mainModule('client-main.ts', 'client');
 });
