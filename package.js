@@ -1,6 +1,6 @@
 Package.describe({
   name: 'zodern:relay',
-  version: '0.0.1',
+  version: '1.0.0',
   // Brief, one-line summary of the package.
   summary: 'Type safe Meteor methods and publications',
   // URL to the Git repository containing the source code for this package.
