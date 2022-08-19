@@ -31,7 +31,7 @@ export const createProject = createMethod({
 
 ```
 
-`/client/exampleProject.ts`
+/client/exampleProject.ts
 ```ts
 import { createProject } from '/imports/methods/projects';
 
@@ -80,7 +80,7 @@ If you haven't already, add [`zodern:types`](https://atmospherejs.com/zodern/typ
 
 ## Methods
 
-You can define methods in files in `methods` directories. The `methods` directories should not be inside a `client` or `server` folder so you can import the methods on both the client and server. The babel plugin will remove all server code from these files when imported on the client.
+You can define methods in files in `methods` directories. The `methods` directories should not be inside a `client` or `server` folder so you can import the methods on both the client and server. The babel plugin will replace the content of these files when imported on the client, so you don't have to worry about server code being exposed.
 
 ```ts
 import { createMethod } from 'meteor/zodern:relay';
@@ -126,7 +126,7 @@ On the client, only `config.name` is defined.
 
 ## Publications
 
-You can define publicaitons in files in `publications` directories. The `publications` directories should not be inside a `client` or `server` folder so you can import the publications on both the client and server. The babel plugin will remove all server code from these files when imported on the client.
+You can define publications in files in `publications` directories. The `publications` directories should not be inside a `client` or `server` folder so you can import the publications on both the client and server. The babel plugin will replace the content of these files when imported on the client, so you don't have to worry about server code being exposed.
 
 ```ts
 import { createPublication } from 'meteor/zodern:relay';
@@ -148,12 +148,13 @@ export const subscribeProject = createPublication({
 
 The schema is used to provide types for for the `run` function's parameter, and to check the arguments when subscribing to the publication.
 
-`createPublication` returns a function you can use to subscribe to the publication. The function returns a [Subscription Handle](https://docs.meteor.com/api/pubsub.html#Meteor-subscribe), the same as `Meteor.subscribe` would.
+`createPublication` returns a function you can use to subscribe to the publication. This function returns a [Subscription Handle](https://docs.meteor.com/api/pubsub.html#Meteor-subscribe), the same as `Meteor.subscribe` would.
 
 ```ts
 import { subscribeProject } from '/imports/publications/projects'
 
 const exampleId = 'example';
+
 subscribeProject({ id: exampleId });
 
 subscribeProject({ id: exampleId }, {
@@ -177,7 +178,7 @@ Meteor has a bug for methods and publications with an async function where they 
 ## Rate limiting
 
 Both `createMethod` and `createPublication` support a `rateLimit` option:
-```
+```ts
 export const add = createMethod({
   name: 'add',
   schema: z.number().array().length(2),
@@ -192,3 +193,7 @@ export const add = createMethod({
 ```
 
 `interval` is the number of ms before the rate limit is reset. `limit` is the maximum number of method calls or created subscriptions allowed per time interval.
+
+## Method Stubs
+
+`zodern:relay` currently doesn't have any built in support for method stubs. You can define method stubs as you would when not using `zodern:relay` in files outside of `methods` directories.
