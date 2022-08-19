@@ -2,9 +2,9 @@ Package.describe({
   name: 'zodern:relay',
   version: '0.0.1',
   // Brief, one-line summary of the package.
-  summary: '',
+  summary: 'Type safe Meteor methods and publications',
   // URL to the Git repository containing the source code for this package.
-  git: '',
+  git: 'https://github.com/zodern/meteor-relay.git',
   // By default, Meteor will default to using README.md for documentation.
   // To avoid submitting documentation, set this field to null.
   documentation: 'README.md'
