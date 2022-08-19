@@ -2,7 +2,7 @@
 
 zodern:relay allows you to easily write methods and publications, and have typescript check the types of the args and result wherever you call the method or subscribe to a publication.
 
-/imports/methods/projects.ts:
+#### /imports/methods/projects.ts:
 ```ts
 import { createMethod } from 'meteor/zodern:relay';
 import { z } from 'zod';
@@ -31,7 +31,7 @@ export const createProject = createMethod({
 
 ```
 
-/client/exampleProject.ts
+#### /client/exampleProject.ts
 ```ts
 import { createProject } from '/imports/methods/projects';
 
