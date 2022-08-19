@@ -56,6 +56,11 @@ export function createMethod<S extends z.ZodNever | z.ZodTypeAny, T>(config: {
   return call;
 }
 
+interface SubscriptionCallbacks {
+  onStop?: (err?: any) => void,
+  onReady?: () => void
+}
+
 export function createPublication<S extends z.ZodTypeAny, T>(config: {
   name: string | null;
   schema: S,
@@ -91,14 +96,8 @@ export function createPublication<S extends z.ZodTypeAny, T>(config: {
     }, config.rateLimit.limit, config.rateLimit.interval)
   }
 
-
-  interface Callbacks {
-    onStop?: (err?: any) => void,
-    onReady?: () => void
-  }
-
-  function subscribe(...args: S extends z.ZodNever ? [Callbacks?] : [z.input<S>, Callbacks?]): Meteor.SubscriptionHandle
-  function subscribe(args?: z.input<S> | Callbacks, callbacks?: Callbacks) {
+  function subscribe(...args: S extends z.ZodNever ? [SubscriptionCallbacks?] : [z.input<S>, SubscriptionCallbacks?]): Meteor.SubscriptionHandle
+  function subscribe(args?: z.input<S> | SubscriptionCallbacks, callbacks?: SubscriptionCallbacks) {
     if (config.name === null) {
       throw new Error('Cannot directly subscribe to null publication');
     }
