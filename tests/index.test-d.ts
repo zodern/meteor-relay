@@ -2,9 +2,9 @@ import { expectError, expectType } from 'tsd';
 import { z } from 'zod';
 import { createMethod, createPublication } from '../server-main';
 
-const neverMethod = createMethod({
+const undefinedMethod = createMethod({
   name: 'test',
-  schema: z.never(),
+  schema: z.undefined(),
   run() {
     return 5;
   }
@@ -37,8 +37,8 @@ const anyMethod = createMethod({
   }
 });
 
-expectType<Promise<number>>(neverMethod());
-expectError(neverMethod(5));
+expectType<Promise<number>>(undefinedMethod());
+expectError(undefinedMethod(5));
 
 expectType<Promise<boolean>>(objMethod({ a: 5, b: 'abc' }));
 expectError(objMethod());
@@ -52,9 +52,9 @@ expectType<Promise<string>>(anyMethod('123'));
 // TODO: fix this
 // expectType<Promise<string>>(anyMethod());
 
-const neverSubscribe = createPublication({
+const undefinedSubscribe = createPublication({
   name: 'test',
-  schema: z.never(),
+  schema: z.undefined(),
   run() {
   }
 });
@@ -83,8 +83,8 @@ const anySubscribe = createPublication({
   }
 });
 
-expectType<Meteor.SubscriptionHandle>(neverSubscribe());
-expectError(neverSubscribe(5));
+expectType<Meteor.SubscriptionHandle>(undefinedSubscribe());
+expectError(undefinedSubscribe(5));
 
 expectType<Meteor.SubscriptionHandle>(objSubscribe({ a: 5, b: 'abc' }));
 expectError(objSubscribe());
@@ -110,7 +110,7 @@ expectType<Meteor.SubscriptionHandle>(stringSubscribe('fun3', {
   }
 }));
 
-expectType<Meteor.SubscriptionHandle>(neverSubscribe({
+expectType<Meteor.SubscriptionHandle>(undefinedSubscribe({
   onReady() {
     console.log('ready');
   }

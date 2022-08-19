@@ -95,7 +95,7 @@ export const add = createMethod({
 });
 ```
 
-`schema` is always required, and must be a schema created from the `zod` npm package. If the method does not have any arguments, you can use `zod.never()` as the schema. If you do not want to check the arguments, you can use `zod.any()`.
+`schema` is always required, and must be a schema created from the `zod` npm package. If the method does not have any arguments, you can use `zod.undefined()` as the schema. If you do not want to check the arguments, you can use `zod.any()`.
 
 The schema is used to provide types for for the `run` function's parameter, and to check the arguments when calling the method.
 
@@ -144,7 +144,7 @@ export const subscribeProject = createPublication({
 });
 ```
 
-`schema` is always required, and must be a schema created from the `zod` npm package. If the method does not have any arguments, you can use `zod.never()` as the schema. If you do not want to check the arguments, you can use `zod.any()`.
+`schema` is always required, and must be a schema created from the `zod` npm package. If the method does not have any arguments, you can use `zod.undefined()` as the schema. If you do not want to check the arguments, you can use `zod.any()`.
 
 The schema is used to provide types for for the `run` function's parameter, and to check the arguments when subscribing to the publication.
 
