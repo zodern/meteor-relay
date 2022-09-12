@@ -1,30 +1,46 @@
 import type * as z from "zod";
 import type { Subscription } from 'meteor/meteor';
+import type { CreateMethod, CreatePublication, SubscriptionCallbacks } from './types'
 
 function isThenable(possiblePromise: any): possiblePromise is Promise<any> {
   return possiblePromise && typeof possiblePromise.then === 'function';
 }
 
-export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config: {
+export const createMethod: CreateMethod = function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config: {
   name: string;
   schema: S,
   rateLimit?: {
     interval: number,
     limit: number
   },
-  run: (this: Meteor.MethodThisType, args: z.output<S>) => T
+  run: ((args: any, context: any) => any)[] | ((this: Meteor.MethodThisType, args: z.output<S>) => T)
 }) {
+  let pipeline: any = config.run;
+
+  if (typeof config.run === 'function') {
+    pipeline = [config.run];
+  }
 
   Meteor.methods({
     [config.name](data) {
       let parsed: z.output<S> = config.schema.parse(data);
-      let result: T = config.run.call(this, parsed);
+      let self = this;
 
-      if (isThenable(result)) {
-        return (Promise as any).await(result);
-      } else {
-        return result;
+      async function run() {
+        let input: any = parsed;
+
+        for (const func of pipeline) {
+          input = func.call(self, input);
+          if (isThenable(input)) {
+            input = await input;
+          }
+        }
+
+        return input;
       }
+
+      let result = run();
+      return (Promise as any).await(result);
     }
   });
 
@@ -38,8 +54,7 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
     }, config.rateLimit.limit, config.rateLimit.interval);
   }
 
-  function call(...args: S extends z.ZodUndefined ? [] : [z.input<S>]): Promise<T>
-  function call (args?: z.input<S>): Promise<T> {
+  function call(args?: z.input<S>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       Meteor.call(config.name, args, (err: null | Meteor.Error, result: T) => {
         if (err) {

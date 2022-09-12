@@ -6,7 +6,10 @@ const {
   errorMethod,
   wait100,
   fastMethod,
-  configMethod
+  configMethod,
+  simplePipeline,
+  asyncPipeline,
+  methodUnblock
 } = require('./methods/index.js');
 
 Tinytest.addAsync('methods - basic', async (test) => {
@@ -21,6 +24,12 @@ Tinytest.addAsync('methods - error', async (test) => {
   } catch (e) {
     test.equal(e.message, '[test error]');
   }
+});
+
+Tinytest.addAsync('methods - unblock', async (test) => {
+  const result = await methodUnblock(5);
+  console.log('after', result);
+  test.equal(result, undefined);
 });
 
 if (Meteor.isServer) {
@@ -72,3 +81,15 @@ if (Meteor.isClient) {
     }
   });
 }
+
+Tinytest.addAsync('methods - pipeline', async (test) => {
+  const result = await simplePipeline(10)
+
+  test.equal(result, 14.5);
+});
+
+Tinytest.addAsync('methods - async pipeline', async (test) => {
+  const result = await asyncPipeline(10)
+
+  test.equal(result, 14.5);
+});

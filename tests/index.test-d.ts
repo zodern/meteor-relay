@@ -37,6 +37,25 @@ const anyMethod = createMethod({
   }
 });
 
+const pipelineMethod = createMethod({
+  name: 'test5',
+  schema: z.number(),
+  run: [
+    (i) => i + 5,
+    (i) => i - 1,
+    (i) => i / 2
+  ]
+});
+const asyncMethod = createMethod({
+  name: 'test5',
+  schema: z.number(),
+  run: [
+    async (i) => i + 5,
+    (i) => i - 1,
+    (i) => i / 2
+  ]
+});
+
 expectType<Promise<number>>(undefinedMethod());
 expectError(undefinedMethod(5));
 
@@ -51,6 +70,12 @@ expectError(stringMethod({ a: 20 }));
 expectType<Promise<string>>(anyMethod('123'));
 // TODO: fix this
 // expectType<Promise<string>>(anyMethod());
+
+expectType<Promise<number>>(pipelineMethod(20));
+expectError(pipelineMethod('5'));
+
+expectType<Promise<number>>(asyncMethod(20));
+
 
 const undefinedSubscribe = createPublication({
   name: 'test',
