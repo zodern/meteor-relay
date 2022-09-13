@@ -82,3 +82,16 @@ you are calling createPublication only in files inside a publications directory`
     done();
   }
 });
+
+Tinytest.addAsync('publications - pipeline', (test, done) => {
+  let sub = subscribePipeline(
+    10,
+    {
+      async onReady() {
+        sub.stop();
+        let events = await getEvents();
+        test.equal(events, ['input: 10', 'complete: 20'])
+        done();
+      }
+    });
+});

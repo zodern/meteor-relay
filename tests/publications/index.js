@@ -1,4 +1,5 @@
-import { createPublication } from 'meteor/zodern:relay';
+import { createPublication, withCursors } from 'meteor/zodern:relay';
+import { recordEvent, resetEvents } from '../methods/index';
 const { z } = require('zod');
 
 export const subscribeBasic = createPublication({
@@ -46,4 +47,21 @@ export const subscribeFast = createPublication({
   async run() {
     return [];
   }
+});
+
+export const subscribePipeline = createPublication({
+  name: 'pipeline',
+  schema: z.number(),
+  run: [
+    (i) => {
+      resetEvents();
+      recordEvent(`input: ${i}`);
+      return i
+    },
+    async (i) => i + 10,
+    (i) => {
+      recordEvent(`complete: ${i}`);
+      return []
+    }
+  ]
 });

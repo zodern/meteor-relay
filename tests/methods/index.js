@@ -20,7 +20,7 @@ export const errorMethod = createMethod({
 export const methodUnblock = createMethod({
   name: 'methodUnblock',
   schema: z.number(),
-  run(){
+  run() {
     this.unblock();
   }
 })
@@ -63,13 +63,13 @@ export const fastMethod = createMethod({
   }
 });
 
-export const simplePipeline =createMethod({
+export const simplePipeline = createMethod({
   name: 'simplePipeline',
   schema: z.number(),
   run: [
     (n) => n + 5,
     (n) => n - 1,
-    (n) => n + 0.5 
+    (n) => n + 0.5
   ]
 });
 
@@ -82,3 +82,21 @@ export const asyncPipeline = createMethod({
     async (n) => n + 0.5
   ]
 });
+
+let events = [];
+
+export function recordEvent(text) {
+  events.push(text);
+}
+
+export function resetEvents() {
+  events = [];
+}
+
+export const getEvents = createMethod({
+  name: 'getEvents',
+  schema: z.undefined(),
+  run() {
+    return events;
+  }
+})
