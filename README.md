@@ -194,6 +194,220 @@ export const add = createMethod({
 
 `interval` is the number of ms before the rate limit is reset. `limit` is the maximum number of method calls or created subscriptions allowed per time interval.
 
+## Pipelines
+
+Instead of defining a single run function, a pipeline allows you to use an array of functions as a pipe. The output of each function is then used as the input of the next function. For example:
+
+```ts
+export const getTasks = createMethod({
+  name: 'getTasks',
+  schema: z.object({
+    tag: z.string().optional()
+    status: z.string().optional(),
+  }),
+  run: [ 
+    (input) => ({ ...input, status: input.status || 'new' }),
+    pickOrganization,
+    ({ tag, status, organizationId }) => {
+      return Tasks.find({ organizationId, status, tag }).fetch();
+    }
+  ]
+});
+```
+
+This method has 3 steps in the pipeline. The first step takes the data sent from the client, and then returns an object with the status set to a default value. The next step takes that as the input, and then adds an `organizationId` property. The final step uses the completed input, and returns some documents from the database. Since this is the last step, its return value is sent to the client.
+
+Benefits of pipelines:
+- Allows you to break complicated methods and publications into multiple steps
+- Types for the input are automatically inferred through the pipeline
+- Composable: you can create functions that are used in the pipelines for many methods or publications. You can even create partial pipelines - groups of pipeline steps you can then add to pipelines while maintaining their types
+- Reactive Publications: steps of the pipeline can optionally re-run when data in the database changes, allowing you to then change what cursors are published
+- You can define global pipeline steps that run before and after every method or publication
+
+### Re-usable pipeline steps
+
+With js, you can simply create a function that returns the input for the next step:
+```js
+function pipelineStep(input) {
+  // Do work...
+
+
+  return input;
+}
+```
+
+With typescript, you have to write it as a generic function so typescript can track the types in the pipeline:
+```ts
+function pipelineStep<T>(input: T) {
+  // Do work...
+
+  return input;
+}
+
+// Expects the input to have a projectId property
+// Typescript will validate that the previous pipeline step returned an object
+// with projectId
+function pipelineStep<T extends { projectId: string }>(input: T) {
+  let projectId = input;
+  
+  // Do work...
+
+  return input;
+}
+```
+
+### Partial Pipelines
+
+Partial pipelines are reusable arrays of pipeline steps. If you are adding the same list of pipeline steps to many methods or publications, partial pipelines can make it easier:
+
+```ts
+import { partialPipeline } from 'meteor/zodern:relay';
+
+let adminPipeline = partialPipeline([
+  requireAdmin,
+  unblock,
+  auditAdmin
+]);
+
+export const listUsers = createMethod({
+  name: 'listUsers',
+  schema: z.undefined(),
+  run: [ 
+    adminPipeline,
+    () => Users.find().fetch();
+  ]
+});
+```
+
+### Pipeline step arguments
+
+Each step in the pipeline is passed two arguments:
+1. The output from the previous step. If the first step, it is given the initial data
+2. The pipeline object.
+
+The pipeline object has a number of useful functions and properties:
+- `initialData` the data given to the first step of the pipeline
+- `type` either `method` or `publication`
+- `name` the name of the method or publication
+- `onResult` Pass `onResult` a callback to run when the method or publication finishes. The callback is given the final result. Please note that the callback should not modify the result.
+- `onError` Pass `onError` a callback to run when the method or publication errors. If you want to change the error, the callback can return an error that should be used instead
+- `stop` calling this will stop the pipeline - the current step will finish, but subsequent steps will not run. For publications, this will also mark the subscription as ready. For methods, it will cause the method to return undefined.
+
+
+Here is an example of a re-usable pipeline step that logs the results of methods
+
+```ts
+function logResult (input, pipeline) {
+  if (pipeline.type === 'publication') {
+    return;
+  }
+
+  pipeline.onResult((result) => {
+    console.log(`Method ${pipeline.name} finished`);
+    console.log('Result', result);
+  });
+
+  pipeline.onError((err) => {
+    console.log(`Method ${pipeline.name} failed`);
+    console.log('Error', err);
+  });
+}
+
+```
+
+### Global Pipeline
+
+If you have a step you want to run before or after every method or publication, you can configure the global pipeline. Please note that the global pipeline should return the input unmodified. Any modifications will not be reflected in the types.
+
+```ts
+import { setGlobalMethodsPipeline, setGlobalPublicationPipeline } from 'meteor/zodern:relay';
+
+setGlobalPipeline([
+  auditMethods,
+  logStatus
+]);
+
+setGlobalPublicationPipeline([
+  auditPublications,
+  logStatus
+]);
+```
+
+### Reactive Publication Pipelines
+
+Reactive pipelines allows steps of the pipeline to re-run when the results of a Mongo cursor change. This is useful for reactive joins, reacting to changes in permissions, and other use cases.
+
+The function `withCursors` allows the pipeline to watch for changes in the database:
+
+```js
+function pipelineStep(input) {
+  let cursor = Projects.find({ owner: Meteor.userId(), organization: input.organization });
+
+  return withCursors(input, { projects: cursor });
+}
+```
+
+`withCursors` accepts two arguments. The first one is the input for the next step. The second argument is an object with the Mongo queries to watch. The two objects are merged together, with the cursors being replaced with the cursor results. In the above example, the input for the next step will have a new `projects` property with the value being the results of the cursor.
+
+When the results of any of the cursors change, the input for the next step will be updated and the pipeline will be re-run starting at the next step.
+
+Here is a complete example:
+
+```ts
+createMethod({
+  name: 'allTasks',
+  schema: z.object({
+    organization: z.string()
+  }),
+  run: [ 
+    (input) => {
+      let cursor = Projects.find({ owner: Meteor.userId(), organization: input.organization });
+
+      return withCursors(input, { projects: cursor });
+    },
+    (input) => {
+      let projectIds = input.projects.map(project => project._id);
+
+      return Tasks.find({ project: { $in: projectIds } });
+    }
+  ]
+});
+```
+
+The first step of the pipeline creates a cursor to find all projects the user owns. This cursor is passed in the second object to `withCursors`, with the key `projects`.
+
+The input of the second step has a new property named `projects`, matching what the key for the cursor. The `projects` property has an array of all the docs found by the cursor.
+
+Whenever the results of the cursor change (maybe the user deleted a project or created a new one), the second step of the pipeline is re-run, with the `projects` property having the new list of docs. This allows it to replace the query being published to use the current list of projects.
+
+Here is an example showing reacting to permission changes:
+
+```ts
+createMethod({
+  name: 'adminListUsers',
+  schema: z.undefined(),
+  run: [ 
+    (input) => {
+      const user = Meteor.users.find({_id: Meteor.userId()});
+
+      return withCursors(input, { user })
+    },
+    (input) => {
+      const [ user ] = input.user;
+
+      if (user.isAdmin) {
+        return Users.find().fetch();
+      }
+
+      return [];
+    }
+  ]
+});
+```
+
+The first step of the pipeline creates a cursor to get the doc for the current user. The second step then uses the doc to check if the user is an admin to decide if it should publish the data. If the user's doc is later modified so they are no longer an admin, the second step of the pipeline will then re-run, allowing it to stop publishing any data.
+
+
 ## Method Stubs
 
 `zodern:relay` currently doesn't have any built in support for method stubs. You can define method stubs as you would when not using `zodern:relay` in files outside of `methods` directories.
