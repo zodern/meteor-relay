@@ -9,7 +9,9 @@ export { partialPipeline, withCursors };
 let globalMethodPipeline: any[] = [];
 let globalPublicationPipeline: any[] = [];
 
-export function setGlobalMethodPipeline (...pipeline: ((this: Meteor.MethodThisType, input: any, context: PipelineContext<any>) => {})[]) {
+export function setGlobalMethodPipeline (
+  ...pipeline: ((this: Meteor.MethodThisType, input: any, context: PipelineContext<any>) => {})[]
+) {
   if (globalMethodPipeline.length > 0) {
     throw new Error('Global method pipeline already configured');
   }
@@ -17,7 +19,9 @@ export function setGlobalMethodPipeline (...pipeline: ((this: Meteor.MethodThisT
   globalMethodPipeline = pipeline;
 }
 
-export function setGlobalPublicationPipeline(...pipeline: ((this: Subscription, input: any, context: PipelineContext<any>) => {})[]) {
+export function setGlobalPublicationPipeline(
+  ...pipeline: ((this: Subscription, input: any, context: PipelineContext<any>) => {})[]
+) {
   if (globalPublicationPipeline.length > 0) {
     throw new Error('Global publication pipeline already configured');
   }
@@ -55,8 +59,9 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
       let onResult: ((value: any) => void)[] = [];
       let onError: ((err: any) => any)[] = [];
 
-      let parsed: z.output<S> = config.schema.parse(data);
       let self = this;
+      let parsed: z.output<S> = config.schema.parse(data);
+
       let context: PipelineContext<z.output<S>> = {
         originalInput: parsed,
         type: 'method',
@@ -234,38 +239,48 @@ export function createPublication<S extends z.ZodTypeAny, T>(
       // TODO: remove docs for collections that are no longer being published
     }
 
-    let scheduled = false;
-    function scheduleRun() {
-      if (scheduled) {
-        return;
-      }
-
-      Meteor.defer(() => {
-        scheduled = false;
-        run();
-      });
-    }
-
-    let dirty: boolean[] = [true];
-    // TODO: do we need to store inputs?
-    let inputs: any[] = [parsed];
-    let needsRun = false;
+    let dirty: { index: number, input: any } | null = null;
     let isRunning = false;
-    let subStopped = false;
-    let stopPipeline = false;
+    let pipelineStopped = false;
 
     this.onStop(() => {
-      subStopped = true;
-
-      // If the pipeline is running, let it finish first
-      if (!isRunning) {
-        stop();
-      }
+      pipelineStopped = true;
+      stop();
     });
 
     function stop() {
       stopPipelineSubscriptions.forEach((func) => func && func());
       handles.forEach(handle => handle.stop());
+    }
+
+    function markDirty(index: number, input: any) {
+      if (dirty) {
+        if (index < dirty.index) {
+          dirty.index = index;
+          dirty.input = input;
+        }
+        return;
+      }
+
+      dirty = {
+        index,
+        input
+      };
+
+      if (!isRunning) {
+        Meteor.defer(runFromDirty);
+      }
+    }
+
+    function runFromDirty() {
+      let dirtyTmp = dirty;
+      dirty = null;
+
+      if (dirtyTmp === null) {
+        throw new Error('Tried to run pipeline, but not dirty?');
+      }
+
+      run(dirtyTmp.index, dirtyTmp.input);
     }
 
     let onResult: ((result: any) => void)[] = [];
@@ -281,7 +296,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
         onError.push(callback);
       },
       stop() {
-        stopPipeline = true;
+        pipelineStopped = true;
         self.ready();
 
         stopPipelineSubscriptions.forEach(func => func && func());
@@ -289,50 +304,37 @@ export function createPublication<S extends z.ZodTypeAny, T>(
       }
     }
 
-    async function run() {
+    async function run(startIndex: number, startInput: any) {
       if (isRunning) {
         console.log('zodern:relay Tried to run pipeline while it is already running??');
         return;
       }
+
       isRunning = true;
-      let start = dirty.findIndex(d => d);
-      if (start === -1) {
-        // TODO: remove this log after checking this doesn't happen more often than it should
-        console.log('zodern:relay Tried to run pipeline when no steps are dirty??');
-        return;
-      }
-      for (let index = start; index < fullPipeline.length; index++) {
+      let input = startInput;
+
+      for (let index = startIndex; index < fullPipeline.length; index++) {
         const func = fullPipeline[index];
 
         let stopPrevious = stopPipelineSubscriptions[index];
         if (stopPrevious) stopPrevious();
 
-        if (stopPipeline) {
+        if (pipelineStopped) {
           break;
         }
 
-        let result = func.call(self, inputs[index], context);
+        let result = func.call(self, input, context);
         if (isThenable(result)) {
           result = await result;
         }
 
-        if (stopPipeline) {
+        if (pipelineStopped) {
           break;
         }
 
-        inputs[index + 1] = result;
-        dirty[index] = false;
-
         if (result && result[Subscribe]) {
           let stopSubscription = result[Subscribe]((newResult: any) => {
-            inputs[index + 1] = newResult;
-            dirty[index + 1] = true;
-
-            if (isRunning) {
-              needsRun = true;
-            } else {
-              scheduleRun();
-            }
+            markDirty(index + 1, newResult);
           });
 
           stopPipelineSubscriptions[index] = stopSubscription;
@@ -341,18 +343,17 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
       isRunning = false;
 
-      if (subStopped) {
-        stop();
-
+      if (pipelineStopped) {
         return;
       }
 
-      if (needsRun) {
-        needsRun = false;
-        scheduleRun();
+      if (dirty) {
+        // TODO: it would be good if this waited a little bit
+        // before running again like markDirty does
+        runFromDirty();
       }
 
-      let output = inputs[fullPipeline.length];
+      let output = input;
       let forwardOutput = false;
 
       if (stopPipelineSubscriptions.length > 0) {
@@ -363,7 +364,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
         if (output && !Array.isArray(output) && output._publishCursor) {
           publishCursors([output]);
         } else if (Array.isArray(output) && output.every(c => c._publishCursor)) {
-          publishCursors(inputs[fullPipeline.length]);
+          publishCursors(output);
         }
       } else {
         forwardOutput = true;
@@ -376,7 +377,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     }
 
     try {
-      const result = (Promise as any).await(run());
+      const result = (Promise as any).await(run(0, parsed));
 
       onResult.forEach(cb => {
         cb(result.output);
