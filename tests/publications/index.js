@@ -1,4 +1,4 @@
-import { createPublication, withCursors, partialPipeline } from 'meteor/zodern:relay';
+import { createPublication, withCursors, partialPipeline, setGlobalPublicationPipeline } from 'meteor/zodern:relay';
 import { recordEvent, resetEvents } from '../methods/index';
 const { z } = require('zod');
 import assert from 'assert';
@@ -132,3 +132,25 @@ export const subscribeFailedContext = createPublication({
     throw new Error('first err');
   }
 );
+
+setGlobalPublicationPipeline(
+  (input, context) => {
+    if (context.name === 'globalPipelinePub') {
+      return input + 1;
+    }
+
+    return input;
+  }
+);
+
+export const globalPipelinePub = createPublication({
+  name: 'globalPipelinePub',
+  schema: z.number(),
+  run(input) {
+    resetEvents();
+    recordEvent(`input: ${input}`);
+
+    console.log('ran');
+    return [];
+  }
+})

@@ -12,6 +12,25 @@ function isThenable(possiblePromise: any): possiblePromise is Promise<any> {
   return possiblePromise && typeof possiblePromise.then === 'function';
 }
 
+let globalMethodPipeline: any[] = [];
+let globalPublicationPipeline: any[] = [];
+
+export function setGlobalMethodPipeline (...pipeline: ((this: Meteor.MethodThisType, input: any, context: PipelineContext<any>) => {})[]) {
+  if (globalMethodPipeline.length > 0) {
+    throw new Error('Global method pipeline already configured');
+  }
+
+  globalMethodPipeline = pipeline;
+}
+
+export function setGlobalPublicationPipeline(...pipeline: ((this: Subscription, input: any, context: PipelineContext<any>) => {})[]) {
+  if (globalPublicationPipeline.length > 0) {
+    throw new Error('Global publication pipeline already configured');
+  }
+
+  globalPublicationPipeline = pipeline;
+}
+
 export function createMethod <S extends z.ZodTypeAny, T > (
   config: { name: string, schema: S, rateLimit ?: { interval: number, limit: number }, run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
 ): (...args: S extends z.ZodUndefined ? [] : [z.input<S>]) => Promise<T>
@@ -62,8 +81,9 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
 
       async function run() {
         let input: any = parsed;
+        let fullPipeline = [...globalMethodPipeline, ...pipeline];
 
-        for (const func of pipeline) {
+        for (const func of fullPipeline) {
           input = func.call(self, input, context);
           if (isThenable(input)) {
             input = await input;
@@ -142,6 +162,8 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     if (pipeline.length === 0) {
       throw new Error(`Pipeline or run function never configured for ${config.name} publication`);
     }
+
+    let fullPipeline = [...globalPublicationPipeline, ...pipeline];
 
     let self = this;
     let parsed: z.output<S> = config.schema.parse(data);
@@ -285,8 +307,8 @@ export function createPublication<S extends z.ZodTypeAny, T>(
         console.log('zodern:relay Tried to run pipeline when no steps are dirty??');
         return;
       }
-      for (let index = start; index < pipeline.length; index++) {
-        const func = pipeline[index];
+      for (let index = start; index < fullPipeline.length; index++) {
+        const func = fullPipeline[index];
 
         let stopPrevious = stopPipelineSubscriptions[index];
         if (stopPrevious) stopPrevious();
@@ -336,7 +358,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
         scheduleRun();
       }
 
-      let output = inputs[pipeline.length];
+      let output = inputs[fullPipeline.length];
       let forwardOutput = false;
 
       if (stopPipelineSubscriptions.length > 0) {
@@ -347,7 +369,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
         if (output && !Array.isArray(output) && output._publishCursor) {
           publishCursors([output]);
         } else if (Array.isArray(output) && output.every(c => c._publishCursor)) {
-          publishCursors(inputs[pipeline.length]);
+          publishCursors(inputs[fullPipeline.length]);
         }
       } else {
         forwardOutput = true;

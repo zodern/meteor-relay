@@ -1,4 +1,5 @@
 import {
+  globalPipelinePub,
   subscribeBasic, subscribeContext, subscribeError, subscribeFailedContext, subscribeFast, subscribePartial, subscribePipeline, subscribeRateLimited, subscribeReactivePipeline, subscribeSlow
 } from './publications/index';
 import {
@@ -132,6 +133,20 @@ Tinytest.addAsync('publications - context onError', (test, done) => {
 
         let events = await getEvents();
         test.equal(events, ['first err', 'first err', '[second err]']);
+        done();
+      }
+    });
+});
+
+Tinytest.addAsync('publications - global pipeline', (test, done) => {
+  let sub = globalPipelinePub(
+    10,
+    {
+      async onReady() {
+        console.log('ready');
+        sub.stop();
+        let events = await getEvents();
+        test.equal(events, ['input: 11']);
         done();
       }
     });

@@ -13,7 +13,8 @@ const {
   partialMethod,
   contextMethod,
   getEvents,
-  contextFailedMethod
+  contextFailedMethod,
+  globalPipelineMethod
 } = require('./methods/index.js');
 
 Tinytest.addAsync('methods - basic', async (test) => {
@@ -122,4 +123,9 @@ Tinytest.addAsync('methods - context error', async (test) => {
 
   const events = await getEvents();
   test.equal(events, ['first err', 'first err']);
+});
+
+Tinytest.addAsync('methods - global pipeline', async (test) => {
+    const result = await globalPipelineMethod(5);
+    test.equal(result, 6);
 });

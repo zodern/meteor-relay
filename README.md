@@ -320,9 +320,9 @@ function logResult (input, pipeline) {
 If you have a step you want to run before or after every method or publication, you can configure the global pipeline. Please note that the global pipeline should return the input unmodified. Any modifications will not be reflected in the types.
 
 ```ts
-import { setGlobalMethodsPipeline, setGlobalPublicationPipeline } from 'meteor/zodern:relay';
+import { setGlobalMethodPipeline, setGlobalPublicationPipeline } from 'meteor/zodern:relay';
 
-setGlobalPipeline(
+setGlobalMethodPipeline(
   auditMethods,
   logStatus
 );

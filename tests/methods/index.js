@@ -1,5 +1,5 @@
 const { z } = require('zod');
-import { createMethod, partialPipeline } from 'meteor/zodern:relay';
+import { createMethod, partialPipeline, setGlobalMethodPipeline } from 'meteor/zodern:relay';
 import assert from 'assert';
 
 export const test1 = createMethod({
@@ -156,5 +156,23 @@ export const getEvents = createMethod({
   schema: z.undefined(),
   run() {
     return events;
+  }
+});
+
+setGlobalMethodPipeline(
+  (input, context) => {
+    if (context.name === 'globalPipelineMethod') {
+      return input + 1;
+    }
+
+    return input;
+  }
+);
+
+export const globalPipelineMethod = createMethod({
+  name: 'globalPipelineMethod',
+  schema: z.number(),
+  run(input) {
+    return input;
   }
 });
