@@ -66,22 +66,20 @@ export const fastMethod = createMethod({
 export const simplePipeline = createMethod({
   name: 'simplePipeline',
   schema: z.number(),
-  run: [
+}).pipeline(
     (n) => n + 5,
     (n) => n - 1,
     (n) => n + 0.5
-  ]
-});
+);
 
 export const asyncPipeline = createMethod({
   name: 'asyncPipeline',
-  schema: z.number(),
-  run: [
-    async (n) => n + 5,
-    (n) => Promise.resolve(n - 1),
-    async (n) => n + 0.5
-  ]
-});
+  schema: z.number()
+}).pipeline(
+  async (n) => n + 5,
+  (n) => Promise.resolve(n - 1),
+  async (n) => n + 0.5
+);
 
 let events = [];
 

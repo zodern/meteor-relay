@@ -86,8 +86,8 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
   }
 
   return {
-    pipeline(newPipeline: any) {
-      pipeline = newPipeline;
+    pipeline(..._pipeline: any[]) {
+      pipeline = _pipeline;
       return call;
     }
   };
@@ -320,8 +320,8 @@ export function createPublication<S extends z.ZodTypeAny, T>(
   }
 
   return {
-    pipeline(newPipeline: any) {
-      pipeline = newPipeline;
+    pipeline(..._pipeline: any[]) {
+      pipeline = _pipeline;
       return subscribe;
     }
   };

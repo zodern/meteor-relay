@@ -1,9 +1,10 @@
 import {
-  subscribeBasic, subscribeError, subscribeFast, subscribeRateLimited, subscribeSlow
+  subscribeBasic, subscribeError, subscribeFast, subscribePipeline, subscribeRateLimited, subscribeReactivePipeline, subscribeSlow
 } from './publications/index';
 import {
   createPublication
 } from 'meteor/zodern:relay';
+import { getEvents } from './methods/index';
 
 Tinytest.addAsync('publications - basic', (test, done) => {
   let sub = subscribeBasic({
