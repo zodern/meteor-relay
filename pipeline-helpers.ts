@@ -124,13 +124,15 @@ export function createReactiveCursorPublisher(sub: Subscription) {
     });
 
     let previouslyPublished = publishedData;
-    publishedData = {};
+    publishedData = Object.create(null);
+
     // TODO: check if the cursors changed. If a cursor is the same, we could
     // reuse the old handle
     cursors.forEach(cursor => {
       let coll = (cursor as any)._cursorDescription.collectionName;
 
       let previousData = previouslyPublished[coll] || new Map();
+      delete previouslyPublished[coll];
       let data = publishedData[coll] = new Map();
 
       let handle = cursor.observeChanges({
@@ -173,7 +175,12 @@ export function createReactiveCursorPublisher(sub: Subscription) {
       handles.push(handle);
     });
 
-    // TODO: remove docs for collections that are no longer being published
+    Object.entries(previouslyPublished).forEach(([ coll, docs]) => {
+      for (const id of docs.keys()) {
+        sub.removed(coll, id);
+      }
+    });
+
     sub.ready();
   }
 
