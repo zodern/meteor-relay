@@ -287,13 +287,12 @@ Each step in the pipeline is passed two arguments:
 2. The pipeline object.
 
 The pipeline object has a number of useful functions and properties:
-- `initialData` the data given to the first step of the pipeline
+- `originalInput` the data given to the first step of the pipeline
 - `type` either `method` or `publication`
 - `name` the name of the method or publication
 - `onResult` Pass `onResult` a callback to run when the method or publication finishes. The callback is given the final result. Please note that the callback should not modify the result.
 - `onError` Pass `onError` a callback to run when the method or publication errors. If you want to change the error, the callback can return an error that should be used instead
-- `stop` calling this will stop the pipeline - the current step will finish, but subsequent steps will not run. For publications, this will also mark the subscription as ready. For methods, it will cause the method to return undefined.
-
+- `stop` calling this will stop a publication's pipeline - the current step will finish, but subsequent steps will not run. This will also mark the subscription as ready. `stop` currently can not be used with methods.
 
 Here is an example of a re-usable pipeline step that logs the results of methods
 

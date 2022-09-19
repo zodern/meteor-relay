@@ -7,9 +7,11 @@ export interface SubscriptionCallbacks {
 
 export interface PipelineContext<T> {
   originalInput: T,
+  type: 'method' | 'publication',
   name: string | null;
   onError: (err: any) => any;
   onResult: (result: any) => void;
+  stop: () => void;
 }
 
 export interface CreateMethodPipeline<I, This = Meteor.MethodThisType> {

@@ -10,7 +10,10 @@ const {
   simplePipeline,
   asyncPipeline,
   methodUnblock,
-  partialMethod
+  partialMethod,
+  contextMethod,
+  getEvents,
+  contextFailedMethod
 } = require('./methods/index.js');
 
 Tinytest.addAsync('methods - basic', async (test) => {
@@ -29,7 +32,6 @@ Tinytest.addAsync('methods - error', async (test) => {
 
 Tinytest.addAsync('methods - unblock', async (test) => {
   const result = await methodUnblock(5);
-  console.log('after', result);
   test.equal(result, undefined);
 });
 
@@ -99,4 +101,25 @@ Tinytest.addAsync('methods - partial pipeline', async (test) => {
   const result = await partialMethod(3.33)
 
   test.equal(result, '6.7');
+});
+
+Tinytest.addAsync('methods - context success', async (test) => {
+  const result = await contextMethod(5);
+  test.equal(result, true);
+
+  const events = await getEvents();
+  test.equal(events, ['result: true']);
+});
+
+
+Tinytest.addAsync('methods - context error', async (test) => {
+  try {
+    await contextFailedMethod(5);
+    test.equal('should never be reached', true);
+  } catch (e) {
+    test.equal(e.message, '[second err]');
+  }
+
+  const events = await getEvents();
+  test.equal(events, ['first err', 'first err']);
 });

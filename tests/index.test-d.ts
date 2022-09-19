@@ -144,6 +144,30 @@ expectError(partial({ a: 'a' }));
 
 expectType<number>(partialAsync({ a: 5 }));
 
+expectType<(s: string) => Promise<string | null>>(createMethod({
+  name: 'fun',
+  schema: z.string()
+}).pipeline(
+  (input, context) => context.name,
+  (input, context) => {
+    context.onError((err) => new Error('test'));
+    context.onResult((result) => console.log(result));
+    context.type.substring(0, 5);
+
+    return input;
+  }
+));
+
+expectType<(s: string) => Promise<string>>(createMethod({
+  name: 'fun',
+  schema: z.string()
+}).pipeline(
+  (input) => true,
+  (input, context) => {
+    return context.originalInput
+  }
+));
+
 
 const undefinedSubscribe = createPublication({
   name: 'test',

@@ -1,7 +1,7 @@
 import type * as z from "zod";
 import type { Subscription } from 'meteor/meteor';
 import type { Mongo } from 'meteor/mongo';
-import type { CreateMethodPipeline, CreatePubPipeline, SubscriptionCallbacks } from './types'
+import type { CreateMethodPipeline, CreatePubPipeline, PipelineContext, SubscriptionCallbacks } from './types'
 import { flattenPipeline, partialPipeline } from './pipeline-helpers';
 
 export { partialPipeline };
@@ -39,14 +39,32 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
         throw new Error(`Pipeline or run function for ${config.name} never configured`);
       }
 
+      let onResult: ((value: any) => void)[] = [];
+      let onError: ((err: any) => any)[] = [];
+
       let parsed: z.output<S> = config.schema.parse(data);
       let self = this;
+      let context: PipelineContext<z.output<S>> = {
+        originalInput: parsed,
+        type: 'method',
+        name: config.name,
+        onResult(callback: (result: any) => void) {
+          onResult.push(callback);
+        },
+        onError(callback: (error: any) => any) {
+          onError.push(callback);
+        },
+        stop() {
+          // TODO: support stop in methods
+          throw new Error('stop should not be called in methods');
+        }
+      }
 
       async function run() {
         let input: any = parsed;
 
         for (const func of pipeline) {
-          input = func.call(self, input);
+          input = func.call(self, input, context);
           if (isThenable(input)) {
             input = await input;
           }
@@ -55,8 +73,21 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
         return input;
       }
 
-      let result = run();
-      return (Promise as any).await(result);
+      try {
+        let result = (Promise as any).await(run());
+
+        onResult.forEach(callback => {
+          callback(result);
+        });
+
+        return result;
+      } catch (error) {
+        error = onError.reduce((err, callback) => {
+          return callback(err) ?? err;
+        }, error);
+
+        throw error;
+      }
     }
   });
 

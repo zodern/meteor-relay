@@ -1,5 +1,6 @@
 const { z } = require('zod');
 import { createMethod, partialPipeline } from 'meteor/zodern:relay';
+import assert from 'assert';
 
 export const test1 = createMethod({
   name: 'test1',
@@ -94,6 +95,50 @@ export const partialMethod = createMethod({
 }).pipeline(
   partial2,
   (i) => i.toFixed(1)
+);
+
+export const contextMethod = createMethod({
+  name: 'context',
+  schema: z.number()
+}).pipeline(
+  (input, context) => {
+    resetEvents();
+    return true
+  },
+  (input, context) => {
+    assert.equal(input, true);
+    assert.equal(typeof context.originalInput, 'number');
+    assert.equal(context.type, 'method');
+    assert.equal(context.name, 'context');
+
+    context.onResult(r => {
+      events.push(`result: ${r}`);
+    });
+
+    return input;
+  }
+);
+
+export const contextFailedMethod = createMethod({
+  name: 'contextFailedMethod',
+  schema: z.number()
+}).pipeline(
+  (input, context) => {
+    resetEvents();
+    context.onError(err => {
+      events.push(err.message);
+    });
+    context.onError(err => {
+      events.push(err.message);
+      return new Meteor.Error('second err');
+    });
+    context.onResult(() => {
+      events.push('result');
+    });
+  },
+  () => {
+    throw new Error('first err');
+  }
 );
 
 let events = [];
