@@ -70,7 +70,10 @@ export function withCursors<I extends object, T extends Record<string, Mongo.Cur
         // toIndex already accounted for removing the doc at fromIndex
         // could change the toIndex
         result[name].splice(toIndex, 0, doc);
-        updateInput();
+
+        // Don't update input since there will also be a
+        // call to changedAt to apply the changes that caused
+        // the document to move
       }
     });
 
@@ -144,10 +147,10 @@ export function createReactiveCursorPublisher(sub: Subscription) {
               }, {});
             sub.changed(coll, id, Object.assign(prevFields, fields));
             previousData.delete(id);
-            return;
+          } else {
+            sub.added(coll, id, fields);
           }
 
-          sub.added(coll, id, fields);
           data.set(id, fields);
         },
         changed(id, fields) {
@@ -171,6 +174,7 @@ export function createReactiveCursorPublisher(sub: Subscription) {
     });
 
     // TODO: remove docs for collections that are no longer being published
+    sub.ready();
   }
 
   function stop() {

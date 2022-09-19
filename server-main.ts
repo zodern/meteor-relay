@@ -253,17 +253,17 @@ export function createPublication<S extends z.ZodTypeAny, T>(
           break;
         }
 
-        let result = func.call(self, input, context);
-        if (isThenable(result)) {
-          result = await result;
+        input = func.call(self, input, context);
+        if (isThenable(input)) {
+          input = await input;
         }
 
         if (pipelineStopped) {
           break;
         }
 
-        if (result && result[Subscribe]) {
-          let stopSubscription = result[Subscribe]((newResult: any) => {
+        if (input && input[Subscribe]) {
+          let stopSubscription = input[Subscribe]((newResult: any) => {
             markDirty(index + 1, newResult);
           });
 
