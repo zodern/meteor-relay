@@ -9,7 +9,6 @@ import { z } from 'zod';
 import { Projects } from '/shared/collections';
 
 export const createProject = createMethod({
-  name: 'projects.create',
   schema: z.object({
     name: z.string(),
     description: z.string().optional(),
@@ -99,6 +98,8 @@ export const add = createMethod({
 
 The schema is used to provide types for for the `run` function's parameter, and to check the arguments when calling the method.
 
+The `name` is optional. If it is not provided, the babel plugin will add one based on the export name and file name. For example, if a method exported as `createProject` did not have a name, the generated name might look like `createProjectM2962a`.
+
 `createMethod` returns a function you can use to call the method. The function returns a promise that resolves with the result. The result will have the same type as the return value of the `run` function.
 
 ```ts
@@ -147,6 +148,8 @@ export const subscribeProject = createPublication({
 `schema` is always required, and must be a schema created from the `zod` npm package. If the method does not have any arguments, you can use `zod.undefined()` as the schema. If you do not want to check the arguments, you can use `zod.any()`.
 
 The schema is used to provide types for for the `run` function's parameter, and to check the arguments when subscribing to the publication.
+
+The `name` is optional. If it is not provided, the babel plugin will add one based on the export name and file name, with the `subscribe` prefix removed. If the above example did not have a name, the generated name might look like `projectM2957c`.
 
 `createPublication` returns a function you can use to subscribe to the publication. This function returns a [Subscription Handle](https://docs.meteor.com/api/pubsub.html#Meteor-subscribe), the same as `Meteor.subscribe` would.
 
