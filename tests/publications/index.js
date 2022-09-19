@@ -1,5 +1,5 @@
 import { createPublication, withCursors, partialPipeline, setGlobalPublicationPipeline } from 'meteor/zodern:relay';
-import { recordEvent, resetEvents } from '../methods/index';
+import { Numbers, recordEvent, resetEvents, Selected } from '../methods/index';
 const { z } = require('zod');
 import assert from 'assert';
 
@@ -10,7 +10,6 @@ export const subscribeBasic = createPublication({
     return []
   }
 });
-
 
 export const subscribeError = createPublication({
   name: 'error',
@@ -150,7 +149,32 @@ export const globalPipelinePub = createPublication({
     resetEvents();
     recordEvent(`input: ${input}`);
 
-    console.log('ran');
     return [];
   }
-})
+});
+
+export const reactiveSubscribe = createPublication({
+  name: 'reactivePub',
+  schema: z.undefined(),
+}).pipeline(
+  () => {
+    Selected.remove({});
+    resetEvents();
+  },
+  () => {
+    recordEvent('Run Selectors step');
+    return withCursors({}, {
+      selected: Selected.find({}, { sort: { num: 1 } })
+    });
+  },
+  ({ selected }) => {
+    let selectedDescription = selected.map(s => {
+      return `${s._id} - ${s.num}`;
+    }).join(', ');
+    recordEvent(`Selected: ${selectedDescription}`);
+
+    return Numbers.find({
+      num: { $in: selected.map(s => s.num )}
+    });
+  }
+)

@@ -141,6 +141,36 @@ export const contextFailedMethod = createMethod({
   }
 );
 
+setGlobalMethodPipeline(
+  (input, context) => {
+    if (context.name === 'globalPipelineMethod') {
+      return input + 1;
+    }
+
+    return input;
+  }
+);
+
+export const globalPipelineMethod = createMethod({
+  name: 'globalPipelineMethod',
+  schema: z.number(),
+  run(input) {
+    return input;
+  }
+});
+
+// Used for publication tests
+
+export const Numbers = new Mongo.Collection('numbers');
+export const Selected = new Mongo.Collection('selected');
+
+Numbers.remove({});
+Selected.remove({});
+
+for(let i = 0; i < 100; i++) {
+  Numbers.insert({ num: i });
+}
+
 let events = [];
 
 export function recordEvent(text) {
@@ -159,20 +189,34 @@ export const getEvents = createMethod({
   }
 });
 
-setGlobalMethodPipeline(
-  (input, context) => {
-    if (context.name === 'globalPipelineMethod') {
-      return input + 1;
-    }
-
-    return input;
-  }
-);
-
-export const globalPipelineMethod = createMethod({
-  name: 'globalPipelineMethod',
+export const addSelected = createMethod({
+  name: 'addSelected',
   schema: z.number(),
-  run(input) {
-    return input;
+  run(num) {
+    return Selected.insert({
+      _id: num.toString(),
+      num
+    });
+  }
+});
+
+export const removeSelected = createMethod({
+  name: 'removeSelected',
+  schema: z.string(),
+  run(id) {
+    return Selected.remove({
+      _id: id
+    });
+  }
+});
+
+export const updateSelected = createMethod({
+  name: 'updateSelected',
+  schema: z.object({ id: z.string(), num: z.number() }),
+  run({ id, num }) {
+    return Selected.update(
+      { _id: id },
+      { $set: { num } }
+    );
   }
 });
