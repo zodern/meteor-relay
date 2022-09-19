@@ -1,27 +1,5 @@
-function getName(args) {
-  if (args[0].type !== 'ObjectExpression') {
-    return;
-  }
-
-  let obj = args[0];
-  let nameProperty = obj.properties.find((property) => {
-    if (property.key.type !== 'Identifier') {
-      return false;
-    }
-
-    if (property.key.name !== 'name') {
-      return false;
-    }
-    
-    return property.value.type === 'StringLiteral';
-  });
-  
-  if (nameProperty) {
-    return nameProperty.value.value;
-  }
-  
-  return undefined;
-}
+const { createHash } = require('crypto');
+const path = require('path');
 
 // If has a MemberExpression, returns the first call expression in its callee
 // Otherwise, returns the call expression
@@ -72,33 +50,85 @@ module.exports = function (api) {
     )
   }
 
+  function getOrAddName(args, { exportName, filePath, isPub }) {
+    if (args[0].type !== 'ObjectExpression') {
+      return;
+    }
+
+    let obj = args[0];
+    let nameProperty = obj.properties.find((property) => {
+      if (property.key.type !== 'Identifier') {
+        return false;
+      }
+
+      if (property.key.name !== 'name') {
+        return false;
+      }
+
+      return property.value.type === 'StringLiteral';
+    });
+
+    if (nameProperty) {
+      return nameProperty.value.value;
+    }
+
+    let fileHash = 'M' + createHash('sha256')
+      .update(filePath)
+      .digest('hex')
+      .substring(0, 5);
+
+    let name= exportName;
+
+    if (name === null) {
+      let baseName = path.basename(filePath);
+      let lastDotIndex = baseName.lastIndexOf('.');
+      name = baseName.substring(0, lastDotIndex);
+    } else if (isPub && name.startsWith('subscribe')) {
+      name = exportName.substring('subscribe'.length);
+
+      if (name[0] !== name[0].toLowerCase()) {
+        name = `${name[0].toLowerCase()}${name.substring(1)}`
+      }
+    }
+
+    name += fileHash;
+
+    obj.properties.push(t.ObjectProperty(
+      t.Identifier('name'),
+      t.StringLiteral(name)
+    ));
+
+    return name;
+  }
+
   let canHaveMethods = false;
   let canHavePublications = false;
   let createMethodName = null;
   let createPublicationName = null;
   let methods = [];
   let publications = [];
+  let isServer = false;
+  let filePath = ''
+
   return {
     visitor: {
       Program: {
-        enter(path, state) {
+        enter(_, state) {
           createMethodName = null;
           createPublicationName = null;
           methods = [];
           publications = [];
-          canHaveMethods = state.filename.includes('/methods/');
-          canHavePublications = state.filename.includes('/publications/');
 
-          // Leave files as is on the server
-          if (
-            caller.arch.startsWith('os.') ||
-            (!canHaveMethods && !canHavePublications)
-          ) {
-            return path.skip();
-          }
+          let relPath = path.relative(state.cwd, state.filename);
+          filePath = relPath;
+
+          canHaveMethods = relPath.includes('/methods/');
+          canHavePublications = relPath.includes('/publications/');
+
+          isServer = caller.arch.startsWith('os.');
         },
         exit(path) {
-          if (!canHaveMethods && !canHavePublications) {
+          if (isServer ||!canHaveMethods && !canHavePublications) {
             return;
           }
 
@@ -172,7 +202,11 @@ module.exports = function (api) {
         if (
           call.callee.name === createMethodName
         ) {
-          let name = getName(call.arguments);
+          let name = getOrAddName(call.arguments, {
+            exportName: null,
+            filePath,
+            isPub: false
+          });
           if (name === undefined) {
             throw new Error('Unable to find name for createMethod');
           }
@@ -185,7 +219,11 @@ module.exports = function (api) {
         if (
          call.callee.name === createPublicationName
         ) {
-          let name = getName(call.arguments);
+          let name = getOrAddName(call.arguments, {
+            exportName: null,
+            filePath,
+            isPub: true
+          });
           if (name === undefined) {
             throw new Error('Unable to find name for createMethod');
           }
@@ -229,7 +267,11 @@ module.exports = function (api) {
           if (
             call.callee.name === createMethodName
           ) {
-            let name = getName(call.arguments);
+            let name = getOrAddName(call.arguments, {
+              exportName: vDeclaration.id.name,
+              filePath,
+              isPub: false
+            });
             if (name === undefined) {
               throw new Error('Unable to find name for createMethod');
             }
@@ -242,7 +284,11 @@ module.exports = function (api) {
           if (
             call.callee.name === createPublicationName
           ) {
-            let name = getName(call.arguments);
+            let name = getOrAddName(call.arguments, {
+              exportName: vDeclaration.id.name,
+              filePath,
+              isPub: true
+            });
             if (name === undefined) {
               throw new Error('Unable to find name for createMethod');
             }

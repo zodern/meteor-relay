@@ -159,6 +159,13 @@ export const globalPipelineMethod = createMethod({
   }
 });
 
+export const unnamedMethod = createMethod({
+  schema: z.number(),
+  run(input) {
+    return input / 2;
+  }
+});
+
 // Used for publication tests
 
 export const Numbers = new Mongo.Collection('numbers');

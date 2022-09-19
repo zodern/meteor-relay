@@ -177,4 +177,11 @@ export const reactiveSubscribe = createPublication({
       num: { $in: selected.map(s => s.num )}
     });
   }
-)
+);
+
+export const unnamedSubscribe = createPublication({
+  schema: z.undefined(),
+  run() {
+    return []
+  }
+});
