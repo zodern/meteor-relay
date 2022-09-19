@@ -29,13 +29,13 @@ export function setGlobalPublicationPipeline(
 }
 
 export function createMethod <S extends z.ZodTypeAny, T > (
-  config: { name: string, schema: S, rateLimit ?: { interval: number, limit: number }, run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
+  config: { name?: string, schema: S, rateLimit ?: { interval: number, limit: number }, run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
 ): (...args: S extends z.ZodUndefined ? [] : [z.input<S>]) => Promise<T>
 export function createMethod <S extends z.ZodTypeAny>(
-  config: { name: string, schema: S, rateLimit ?: { interval: number, limit: number } }
+  config: { name?: string, schema: S, rateLimit ?: { interval: number, limit: number } }
 ) : { pipeline: CreateMethodPipeline<z.output<S>> }
 export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config: {
-  name: string;
+  name?: string;
   schema: S,
   rateLimit?: {
     interval: number,
@@ -49,10 +49,18 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
     pipeline = [config.run];
   }
 
+  // The name isn't actually optional, but the babel plugin will
+  // add a name if there isn't one
+  if (!config.name) {
+    throw new Error(`Method name is missing. Do you have the relay babel plugin configured?`);
+  }
+
+  let name = config.name;
+
   Meteor.methods({
-    [config.name](data) {
+    [name](data) {
       if (pipeline.length === 0) {
-        throw new Error(`Pipeline or run function for ${config.name} never configured`);
+        throw new Error(`Pipeline or run function for ${name} never configured`);
       }
 
       let onResult: ((value: any) => void)[] = [];
@@ -64,7 +72,7 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
       let context: PipelineContext<z.output<S>> = {
         originalInput: parsed,
         type: 'method',
-        name: config.name,
+        name,
         onResult(callback: (result: any) => void) {
           onResult.push(callback);
         },
@@ -112,7 +120,7 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
   if (config.rateLimit) {
     DDPRateLimiter.addRule({
       type: 'method',
-      name: config.name,
+      name,
       clientAddress() { return true },
       connectionId() { return true },
       userId() { return true },
@@ -121,7 +129,7 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
 
   function call(args?: z.input<S>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      Meteor.call(config.name, args, (err: null | Meteor.Error, result: T) => {
+      Meteor.call(name, args, (err: null | Meteor.Error, result: T) => {
         if (err) {
           reject(err);
         } else {
@@ -145,10 +153,10 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
   };
 }
 
-export function createPublication<S extends z.ZodTypeAny, T>(config: { name: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run: (this: Subscription, args: z.output<S>) => T }): (...args: z.output<S> extends undefined ? [SubscriptionCallbacks?] : [z.output<S>, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle
-export function createPublication<S extends z.ZodTypeAny, R1,> (config: { name: string | null, schema: S, rateLimit ?: { interval: number, limit: number } }): { pipeline: CreatePubPipeline<z.output<S>> }
+export function createPublication<S extends z.ZodTypeAny, T>(config: { name?: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run: (this: Subscription, args: z.output<S>) => T }): (...args: z.output<S> extends undefined ? [SubscriptionCallbacks?] : [z.output<S>, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle
+export function createPublication<S extends z.ZodTypeAny, R1,> (config: { name?: string | null, schema: S, rateLimit ?: { interval: number, limit: number } }): { pipeline: CreatePubPipeline<z.output<S>> }
 export function createPublication<S extends z.ZodTypeAny, T>(
-  config: { name: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run?: ((this: Subscription, args: z.output<S>) => T) }
+  config: { name?: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run?: ((this: Subscription, args: z.output<S>) => T) }
 ): any {
   let pipeline: any = config.run;
 
@@ -156,9 +164,17 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     pipeline = [config.run];
   }
 
-  Meteor.publish(config.name, function (data: z.input<S>) {
+  // The name isn't actually optional, but the babel plugin will
+  // add a name if there isn't one
+  if (typeof config.name === 'undefined') {
+    throw new Error(`Publication name is missing. Do you have the relay babel plugin configured?`);
+  }
+
+  let name = config.name;
+
+  Meteor.publish(name, function (data: z.input<S>) {
     if (pipeline.length === 0) {
-      throw new Error(`Pipeline or run function never configured for ${config.name} publication`);
+      throw new Error(`Pipeline or run function never configured for ${name} publication`);
     }
 
     let fullPipeline = [...globalPublicationPipeline, ...pipeline];
@@ -218,7 +234,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     let context: PipelineContext<z.output<S>> = {
       originalInput: parsed,
       type: 'publication',
-      name: config.name,
+      name,
       onResult(callback: (result: any) => void) {
         onResult.push(callback);
       },
@@ -324,13 +340,13 @@ export function createPublication<S extends z.ZodTypeAny, T>(
   });
 
   if (config.rateLimit) {
-    if (config.name === null) {
+    if (name === null) {
       throw new Error('Cannot add rate limit for null publication');
     }
 
     DDPRateLimiter.addRule({
       type: 'subscription',
-      name: config.name,
+      name,
       clientAddress() { return true },
       connectionId() { return true },
       userId() { return true },
@@ -338,10 +354,10 @@ export function createPublication<S extends z.ZodTypeAny, T>(
   }
 
   function subscribe(...args: S extends z.ZodUndefined ? [SubscriptionCallbacks?] : [z.input<S>, SubscriptionCallbacks?]): Meteor.SubscriptionHandle {
-    if (config.name === null) {
+    if (name === null) {
       throw new Error('Cannot directly subscribe to null publication');
     }
-    return Meteor.subscribe(config.name, args);
+    return Meteor.subscribe(name, args);
   }
 
   subscribe.config = config;

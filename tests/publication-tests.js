@@ -1,7 +1,7 @@
 import {
   globalPipelinePub,
   reactiveSubscribe,
-  subscribeBasic, subscribeContext, subscribeError, subscribeFailedContext, subscribeFast, subscribePartial, subscribePipeline, subscribeRateLimited, subscribeReactivePipeline, subscribeSlow
+  subscribeBasic, subscribeContext, subscribeError, subscribeFailedContext, subscribeFast, subscribePartial, subscribePipeline, subscribeRateLimited, subscribeSlow, unnamedSubscribe
 } from './publications/index';
 import {
   createPublication
@@ -144,10 +144,19 @@ Tinytest.addAsync('publications - global pipeline', (test, done) => {
     10,
     {
       async onReady() {
-        console.log('ready');
         sub.stop();
         let events = await getEvents();
         test.equal(events, ['input: 11']);
+        done();
+      }
+    });
+});
+
+Tinytest.addAsync('publications - unnamed', (test, done) => {
+  let sub = unnamedSubscribe(
+    {
+      async onReady() {
+        sub.stop();
         done();
       }
     });

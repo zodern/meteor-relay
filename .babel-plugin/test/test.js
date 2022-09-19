@@ -41,6 +41,44 @@ export default createMethod({
       `;
       assert.equal(transform(code, '/methods/index.js', 'os.osx.x86_64'), code.trim());
     });
+    it('should add missing names on the server', () => {
+        const code = `
+import { createMethod } from 'meteor/zodern:relay';
+export const createProject = createMethod({
+});
+export default createMethod({
+  
+});
+      `;
+        const expected = `
+import { createMethod } from 'meteor/zodern:relay';
+export const createProject = createMethod({
+  name: "createProjectM000bd"
+});
+export default createMethod({
+  name: "projectsM000bd"
+});
+      `;
+        assert.equal(transform(code, '/methods/projects.js', 'os.osx.x86_64'), expected.trim());
+    });
+
+    it('should add missing names on the client', () => {
+      const code = `
+import { createMethod } from 'meteor/zodern:relay';
+export const createProject = createMethod({
+});
+export default createMethod({
+  
+});
+      `;
+      const expected = `
+import { _createClientMethod } from "meteor/zodern:relay/client";
+export const createProject = _createClientMethod("createProjectM000bd");
+export default _createClientMethod("projectsM000bd");
+      `;
+      assert.equal(transform(code, '/methods/projects.js'), expected.trim());
+    });
+
     it('should handle default exports', () => {
       const code = `
         import { createMethod } from 'meteor/zodern:relay';
@@ -129,7 +167,23 @@ import { _createClientPublication } from "meteor/zodern:relay/client";
 export const sub1 = _createClientPublication("pub1");
 export default _createClientPublication("pub2");
       `.trim());
-    })
+    });
+
+    it('should add missing names', () => {
+      const code = `
+        import { createPublication } from 'meteor/zodern:relay';
+        export const subscribeProjects = createPublication({ })
+          .pipeline(() => []);
+
+        export default createPublication({ });
+      `
+
+      assert.equal(transform(code, '/publications/index.js'), `
+import { _createClientPublication } from "meteor/zodern:relay/client";
+export const subscribeProjects = _createClientPublication("projectsM2962a");
+export default _createClientPublication("indexM2962a");
+      `.trim());
+    });
   });
 
   describe('wrongFolder', () => {
