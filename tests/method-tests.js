@@ -6,7 +6,15 @@ const {
   errorMethod,
   wait100,
   fastMethod,
-  configMethod
+  configMethod,
+  simplePipeline,
+  asyncPipeline,
+  methodUnblock,
+  partialMethod,
+  contextMethod,
+  getEvents,
+  contextFailedMethod,
+  globalPipelineMethod
 } = require('./methods/index.js');
 
 Tinytest.addAsync('methods - basic', async (test) => {
@@ -21,6 +29,11 @@ Tinytest.addAsync('methods - error', async (test) => {
   } catch (e) {
     test.equal(e.message, '[test error]');
   }
+});
+
+Tinytest.addAsync('methods - unblock', async (test) => {
+  const result = await methodUnblock(5);
+  test.equal(result, undefined);
 });
 
 if (Meteor.isServer) {
@@ -72,3 +85,47 @@ if (Meteor.isClient) {
     }
   });
 }
+
+Tinytest.addAsync('methods - pipeline', async (test) => {
+  const result = await simplePipeline(10)
+
+  test.equal(result, 14.5);
+});
+
+Tinytest.addAsync('methods - async pipeline', async (test) => {
+  const result = await asyncPipeline(10)
+
+  test.equal(result, 14.5);
+});
+
+Tinytest.addAsync('methods - partial pipeline', async (test) => {
+  const result = await partialMethod(3.33)
+
+  test.equal(result, '6.7');
+});
+
+Tinytest.addAsync('methods - context success', async (test) => {
+  const result = await contextMethod(5);
+  test.equal(result, true);
+
+  const events = await getEvents();
+  test.equal(events, ['result: true']);
+});
+
+
+Tinytest.addAsync('methods - context error', async (test) => {
+  try {
+    await contextFailedMethod(5);
+    test.equal('should never be reached', true);
+  } catch (e) {
+    test.equal(e.message, '[second err]');
+  }
+
+  const events = await getEvents();
+  test.equal(events, ['first err', 'first err']);
+});
+
+Tinytest.addAsync('methods - global pipeline', async (test) => {
+    const result = await globalPipelineMethod(5);
+    test.equal(result, 6);
+});

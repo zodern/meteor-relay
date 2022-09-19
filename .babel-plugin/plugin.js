@@ -23,6 +23,22 @@ function getName(args) {
   return undefined;
 }
 
+// If has a MemberExpression, returns the first call expression in its callee
+// Otherwise, returns the call expression
+function getFirstCallExpr(call) {
+  if (call.callee.type === 'MemberExpression') {
+    if (
+      call.callee.object.type !== 'CallExpression'
+    ) {
+      return '';
+    }
+
+    return  call.callee.object;
+  }
+
+  return call;
+}
+
 module.exports = function (api) {
   let t = api.types;
 
@@ -147,10 +163,16 @@ module.exports = function (api) {
           return;
         }
 
+        let call = getFirstCallExpr(path.node.declaration);
+
+        if (!call) {
+          return;
+        }
+
         if (
-          path.node.declaration.callee.name === createMethodName
+          call.callee.name === createMethodName
         ) {
-          let name = getName(path.node.declaration.arguments);
+          let name = getName(call.arguments);
           if (name === undefined) {
             throw new Error('Unable to find name for createMethod');
           }
@@ -161,9 +183,9 @@ module.exports = function (api) {
         }
 
         if (
-          path.node.declaration.callee.name === createPublicationName
+         call.callee.name === createPublicationName
         ) {
-          let name = getName(path.node.declaration.arguments);
+          let name = getName(call.arguments);
           if (name === undefined) {
             throw new Error('Unable to find name for createMethod');
           }
@@ -198,10 +220,16 @@ module.exports = function (api) {
             return;
           }
 
+          let call = getFirstCallExpr(vDeclaration.init);
+          
+          if (!call) {
+            return;
+          }
+
           if (
-            vDeclaration.init.callee.name === createMethodName
+            call.callee.name === createMethodName
           ) {
-            let name = getName(vDeclaration.init.arguments);
+            let name = getName(call.arguments);
             if (name === undefined) {
               throw new Error('Unable to find name for createMethod');
             }
@@ -212,9 +240,9 @@ module.exports = function (api) {
           }
 
           if (
-            vDeclaration.init.callee.name === createPublicationName
+            call.callee.name === createPublicationName
           ) {
-            let name = getName(vDeclaration.init.arguments);
+            let name = getName(call.arguments);
             if (name === undefined) {
               throw new Error('Unable to find name for createMethod');
             }

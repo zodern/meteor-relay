@@ -1,5 +1,6 @@
 import { expectError, expectType } from 'tsd';
 import { z } from 'zod';
+import { partialPipeline } from '../pipeline-helpers';
 import { createMethod, createPublication } from '../server-main';
 
 const undefinedMethod = createMethod({
@@ -17,7 +18,7 @@ const objMethod = createMethod({
     b: z.string()
   }),
   run() {
-    return true; 
+    return true;
   }
 });
 
@@ -37,6 +38,77 @@ const anyMethod = createMethod({
   }
 });
 
+const pipelineMethod = createMethod({
+  name: 'test5',
+  schema: z.number(),
+}).pipeline(
+  (i) => i + 5,
+  (i) => i - 1,
+  (i) => i / 2
+);
+
+const asyncPipeline = createMethod({
+  name: 'test5',
+  schema: z.number()
+}).pipeline(
+  async (i) => i + 5,
+  (i) => i - 1,
+  (i) => i / 2
+);
+
+const partial = partialPipeline(
+  <I extends { a: number }>({ a }: I) => a,
+  (i) => i / 2,
+);
+
+const partialAsync = partialPipeline(
+  <I extends { a: number }>({ a }: I) => a,
+  async (i) => i / 2,
+  (i) => i
+);
+
+const partialBoolean = partialPipeline(
+  <I>(i: I) => i,
+  () => true
+)
+
+const subPipeline = partialPipeline(partialBoolean, reusableStep);
+
+const partialMethod = createMethod({
+  name: 'test6',
+  schema: z.object({ a: z.number(), b: z.string() })
+}).pipeline(
+  (input) => input,
+  (i) => i,
+  partial,
+  (i) => i,
+  );
+
+const subPartialMethod = createMethod({
+  name: 'subPartialMethod',
+  schema: z.string()
+}).pipeline(subPipeline, (i) => !i);
+
+function reusableStep<I>(input: I) {
+  return input;
+}
+
+const reusableMethod = createMethod({
+  name: 'test7',
+  schema: z.object({ a: z.number(), b: z.string() })
+}).pipeline(
+  (input) => input,
+  reusableStep,
+  (i) => i,
+);
+
+const undefinedPipeline = createMethod({
+  name: 'test8',
+  schema: z.undefined()
+}).pipeline(
+  () => 5
+);
+
 expectType<Promise<number>>(undefinedMethod());
 expectError(undefinedMethod(5));
 
@@ -49,8 +121,53 @@ expectError(stringMethod());
 expectError(stringMethod({ a: 20 }));
 
 expectType<Promise<string>>(anyMethod('123'));
+
+expectType<Promise<number>>(partialMethod({ a: 5, b: 'true' }));
+
+expectType<Promise<{ a: number, b: string }>>(reusableMethod({ a: 5, b: 'test' }));
+
+expectType<Promise<number>>(undefinedPipeline());
+expectError(undefinedMethod(5));
+
+expectType<Promise<boolean>>(subPartialMethod('fun'));
+
 // TODO: fix this
 // expectType<Promise<string>>(anyMethod());
+
+expectType<Promise<number>>(pipelineMethod(20));
+expectError(pipelineMethod('5'));
+
+expectType<Promise<number>>(asyncPipeline(20));
+
+expectType<number>(partial({ a: 5 }));
+expectError(partial({ a: 'a' }));
+
+expectType<number>(partialAsync({ a: 5 }));
+
+expectType<(s: string) => Promise<string | null>>(createMethod({
+  name: 'fun',
+  schema: z.string()
+}).pipeline(
+  (input, context) => context.name,
+  (input, context) => {
+    context.onError((err: any) => new Error('test'));
+    context.onResult((result: any) => console.log(result));
+    context.type.substring(0, 5);
+
+    return input;
+  }
+));
+
+expectType<(s: string) => Promise<string>>(createMethod({
+  name: 'fun',
+  schema: z.string()
+}).pipeline(
+  (input) => true,
+  (input, context) => {
+    return context.originalInput
+  }
+));
+
 
 const undefinedSubscribe = createPublication({
   name: 'test',
@@ -117,3 +234,17 @@ expectType<Meteor.SubscriptionHandle>(undefinedSubscribe({
 }));
 
 expectType<Meteor.SubscriptionHandle>(stringSubscribe('fun3', {}));
+
+expectType<Meteor.SubscriptionHandle>(createPublication({
+  name: 'fun',
+  schema: z.string()
+}).pipeline(
+  (input, context) => context.name,
+  (input, context) => {
+    context.onError((err: any) => new Error('test'));
+    context.onResult((result: any) => console.log(result));
+    context.type.substring(0, 5);
+
+    return input;
+  }
+)('test'));

@@ -64,6 +64,32 @@ import { _createClientMethod } from "meteor/zodern:relay/client";
 export const myMethod = _createClientMethod("myMethod");
       `.trim());
     });
+
+    it('should handle pipelines', () => {
+      const code = `
+        import { createMethod } from 'meteor/zodern:relay';
+        export const myMethod = createMethod({ name: 'myMethod' })
+          .pipeline(() => 5, (i) => i + 10);
+
+        export default createMethod({ name: 'method2' }).pipeline(() => 5);
+      `
+
+      assert.equal(transform(code), `
+import { _createClientMethod } from "meteor/zodern:relay/client";
+export const myMethod = _createClientMethod("myMethod");
+export default _createClientMethod("method2");
+      `.trim());
+    });
+
+    it('should handle exporting member expressions', () => {
+      const code = `
+        import { createMethod } from 'meteor/zodern:relay';
+        export const schema = z.number();
+        export default z.string();
+      `
+
+      assert.equal(transform(code), '');
+    });
   });
 
   describe('subscriptions', () => {
@@ -88,6 +114,22 @@ import { _createClientPublication } from "meteor/zodern:relay/client";
 export const myPublication = _createClientPublication("myPublication");
       `.trim());
     });
+
+    it('should handle pipelines', () => {
+      const code = `
+        import { createPublication } from 'meteor/zodern:relay';
+        export const sub1 = createPublication({ name: 'pub1' })
+          .pipeline(() => []);
+
+        export default createPublication({ name: 'pub2' }).pipeline(() => []);
+      `
+
+      assert.equal(transform(code, '/publications/index.js'), `
+import { _createClientPublication } from "meteor/zodern:relay/client";
+export const sub1 = _createClientPublication("pub1");
+export default _createClientPublication("pub2");
+      `.trim());
+    })
   });
 
   describe('wrongFolder', () => {
