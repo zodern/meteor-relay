@@ -98,7 +98,7 @@ export const add = createMethod({
 
 The schema is used to provide types for for the `run` function's parameter, and to check the arguments when calling the method.
 
-The `name` is optional. If it is not provided, the babel plugin will add one based on the export name and file name. For example, if a method exported as `createProject` did not have a name, the generated name might look like `createProjectM2962a`.
+The `name` is optional. If it is not provided, the babel plugin will add one based on the export name and file name.
 
 `createMethod` returns a function you can use to call the method. The function returns a promise that resolves with the result. The result will have the same type as the return value of the `run` function.
 
@@ -149,7 +149,7 @@ export const subscribeProject = createPublication({
 
 The schema is used to provide types for for the `run` function's parameter, and to check the arguments when subscribing to the publication.
 
-The `name` is optional. If it is not provided, the babel plugin will add one based on the export name and file name, with the `subscribe` prefix removed. If the above example did not have a name, the generated name might look like `projectM2957c`.
+The `name` is optional. If it is not provided, the babel plugin will add one based on the export name and file name.
 
 `createPublication` returns a function you can use to subscribe to the publication. This function returns a [Subscription Handle](https://docs.meteor.com/api/pubsub.html#Meteor-subscribe), the same as `Meteor.subscribe` would.
 
