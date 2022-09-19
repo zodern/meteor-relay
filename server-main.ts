@@ -1,8 +1,7 @@
 import type * as z from "zod";
 import type { Subscription } from 'meteor/meteor';
-import type { Mongo } from 'meteor/mongo';
 import type { CreateMethodPipeline, CreatePubPipeline, PipelineContext, SubscriptionCallbacks } from './types'
-import { flattenPipeline, isThenable, partialPipeline, Subscribe, withCursors } from './pipeline-helpers';
+import { createReactiveCursorPublisher, flattenPipeline, isThenable, partialPipeline, Subscribe, withCursors } from './pipeline-helpers';
 
 export { partialPipeline, withCursors };
 
@@ -167,77 +166,8 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     let self = this;
     let parsed: z.output<S> = config.schema.parse(data);
     let stopPipelineSubscriptions: (() => void)[] = [];
-    let handles: Meteor.LiveQueryHandle[] = [];
 
-    let publishedData: {
-      [key: string]: Map<string, any>
-    } = {};
-    function publishCursors(cursors: Mongo.Cursor<any>[]) {
-      handles.forEach(handle => handle.stop());
-
-      // Make sure no more than one per collection
-      let colls = new Set();
-      cursors.forEach(cursor => {
-        let coll = (cursor as any)._cursorDescription.collectionName;
-        if (colls.has(coll)) {
-          throw new Error(`Publishing more than one cursor for the collection: ${coll}`);
-        }
-
-        colls.add(coll);
-      });
-
-      let previouslyPublished = publishedData;
-      publishedData = {};
-      // TODO: check if the cursors changed. If a cursor is the same, we could
-      // reuse the old handle
-      cursors.forEach(cursor => {
-        let coll = (cursor as any)._cursorDescription.collectionName;
-
-        let previousData = previouslyPublished[coll] || new Map();
-        let data = publishedData[coll] = new Map();
-
-        let handle = cursor.observeChanges({
-          added(id, fields) {
-            if (previousData.has(id)) {
-              // Some fields might no longer be part of the new cursor
-              // Set all old fields to undefined, and then override any
-              // that still exist with the new value
-              // Fields that are still undefined will be removed by Meteor
-              let prevFields = Object.keys(previousData.get(id))
-                .reduce<{[key: string]: undefined}>((result, field) => {
-                  result[field] = undefined;
-                  return result;
-                }, {});
-              self.changed(coll, id, Object.assign(prevFields, fields));
-              previousData.delete(id);
-              return;
-            }
-
-            self.added(coll, id, fields);
-            data.set(id, fields);
-          },
-          changed(id, fields) {
-            self.changed(coll, id, fields);
-            let oldFields = data.get(id);
-            // TODO: do we need to clone oldFields?
-            data.set(id, Object.assign({}, oldFields, fields));
-          },
-          removed(id) {
-            self.removed(coll, id);
-            data.delete(id);
-          }
-        });
-
-        // Remove docs that are no longer found by the new cursor
-        for(const id of previousData.keys()) {
-          self.removed(coll, id);
-        }
-
-        handles.push(handle);
-      });
-
-      // TODO: remove docs for collections that are no longer being published
-    }
+    let reactivePublisher = createReactiveCursorPublisher(self);
 
     let dirty: { index: number, input: any } | null = null;
     let isRunning = false;
@@ -250,7 +180,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
     function stop() {
       stopPipelineSubscriptions.forEach((func) => func && func());
-      handles.forEach(handle => handle.stop());
+      reactivePublisher.stop();
     }
 
     function markDirty(index: number, input: any) {
@@ -362,9 +292,9 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
         // Meteor checks for _publishedCursor to identify cursors
         if (output && !Array.isArray(output) && output._publishCursor) {
-          publishCursors([output]);
+          reactivePublisher.updateCursors([output]);
         } else if (Array.isArray(output) && output.every(c => c._publishCursor)) {
-          publishCursors(output);
+          reactivePublisher.updateCursors(output);
         }
       } else {
         forwardOutput = true;

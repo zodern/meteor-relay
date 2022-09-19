@@ -1,6 +1,6 @@
 import { PipelineContext } from './types';
 
-type Step<I, R> = (this: Subscription | Meteor.MethodThisType, input: I, context: PipelineContext<unknown>) => R 
+type Step<I, R> = (this: Subscription | Meteor.MethodThisType, input: I, context: PipelineContext<unknown>) => R
 
 const Pipeline = Symbol('zodern:relay:pipeline');
 export const Subscribe = Symbol('zodern:relay:subscribe');
@@ -24,7 +24,7 @@ export function partialPipeline(...steps: any[]): (input: any) => any {
 export function flattenPipeline(pipeline: any[]) {
   let result: Function[] = [];
 
-  for(const step of pipeline) {
+  for (const step of pipeline) {
     if (step[Pipeline]) {
       result.push(...flattenPipeline(step[Pipeline]));
     } else {
@@ -98,4 +98,84 @@ export function withCursors<I extends object, T extends Record<string, Mongo.Cur
   }
 
   return initialOutput;
+}
+
+export function createReactiveCursorPublisher(sub: Subscription) {
+  let handles: Meteor.LiveQueryHandle[] = [];
+  let publishedData: {
+    [key: string]: Map<string, any>
+  } = Object.create(null);
+
+  function updateCursors(cursors: Mongo.Cursor<any> []) {
+    handles.forEach(handle => handle.stop());
+
+    // Make sure no more than one per collection
+    let colls = new Set();
+    cursors.forEach(cursor => {
+      let coll = (cursor as any)._cursorDescription.collectionName;
+      if (colls.has(coll)) {
+        throw new Error(`Publishing more than one cursor for the collection: ${coll}`);
+      }
+
+      colls.add(coll);
+    });
+
+    let previouslyPublished = publishedData;
+    publishedData = {};
+    // TODO: check if the cursors changed. If a cursor is the same, we could
+    // reuse the old handle
+    cursors.forEach(cursor => {
+      let coll = (cursor as any)._cursorDescription.collectionName;
+
+      let previousData = previouslyPublished[coll] || new Map();
+      let data = publishedData[coll] = new Map();
+
+      let handle = cursor.observeChanges({
+        added(id, fields) {
+          if (previousData.has(id)) {
+            // Some fields might no longer be part of the new cursor
+            // Set all old fields to undefined, and then override any
+            // that still exist with the new value
+            // Fields that are still undefined will be removed by Meteor
+            let prevFields = Object.keys(previousData.get(id))
+              .reduce<{ [key: string]: undefined }>((result, field) => {
+                result[field] = undefined;
+                return result;
+              }, {});
+            sub.changed(coll, id, Object.assign(prevFields, fields));
+            previousData.delete(id);
+            return;
+          }
+
+          sub.added(coll, id, fields);
+          data.set(id, fields);
+        },
+        changed(id, fields) {
+          sub.changed(coll, id, fields);
+          let oldFields = data.get(id);
+          // TODO: do we need to clone oldFields?
+          data.set(id, Object.assign({}, oldFields, fields));
+        },
+        removed(id) {
+          sub.removed(coll, id);
+          data.delete(id);
+        }
+      });
+
+      // Remove docs that are no longer found by the new cursor
+      for (const id of previousData.keys()) {
+        sub.removed(coll, id);
+      }
+
+      handles.push(handle);
+    });
+
+    // TODO: remove docs for collections that are no longer being published
+  }
+
+  function stop() {
+    handles.forEach(handle => handle.stop());
+  }
+
+  return { updateCursors, stop };
 }
