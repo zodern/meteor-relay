@@ -2,15 +2,9 @@ import type * as z from "zod";
 import type { Subscription } from 'meteor/meteor';
 import type { Mongo } from 'meteor/mongo';
 import type { CreateMethodPipeline, CreatePubPipeline, PipelineContext, SubscriptionCallbacks } from './types'
-import { flattenPipeline, partialPipeline } from './pipeline-helpers';
+import { flattenPipeline, isThenable, partialPipeline, Subscribe, withCursors } from './pipeline-helpers';
 
-export { partialPipeline };
-
-const Subscribe = Symbol('zodern:relay:subscribe');
-
-function isThenable(possiblePromise: any): possiblePromise is Promise<any> {
-  return possiblePromise && typeof possiblePromise.then === 'function';
-}
+export { partialPipeline, withCursors };
 
 let globalMethodPipeline: any[] = [];
 let globalPublicationPipeline: any[] = [];
@@ -431,66 +425,4 @@ export function createPublication<S extends z.ZodTypeAny, T>(
       return subscribe;
     }
   };
-}
-
-export function withCursors<I extends object, T extends Record<string, Mongo.Cursor<any>>> (input: I, cursors: T):
-  I & { [K in keyof T]: T[K] extends Mongo.Cursor<infer X> ? X[] : never }
-{
-  let hasUpdate = false;
-  let updateInput = () => { hasUpdate = true };
-  let handles: Meteor.LiveQueryHandle[] = [];
-  let docs: {
-    [K in keyof T]: T[K] extends Mongo.Cursor<infer X> ? X[] : never
-  } = Object.entries(cursors).reduce((result: any, [name, cursor]) => {
-    result[name] = [];
-    let initialAdd = true;
-
-    let handle = cursor.observe({  
-      addedAt(document, index) {
-        result[name].splice(index, 0, document);
-        if (!initialAdd) {
-          updateInput();
-        }
-      },
-      changedAt(doc, _old, index) {
-        result[name][index] = doc;
-        updateInput();
-      },
-      removedAt(_doc, index) {
-        result[name].splice(index, 1);
-        updateInput();
-      },
-      movedTo(_doc, fromIndex, toIndex) {
-        let [doc] = result[name].splice(fromIndex, 1);
-        // toIndex already accounted for removing the doc at fromIndex
-        // could change the toIndex
-        result[name].splice(toIndex, 0, doc);
-        updateInput();
-      }
-    });
-    
-    initialAdd = false;
-    handles.push(handle);
-
-    return result;
-  }, {});
-
-  function createOutput() {
-    return Object.assign({}, input, docs);
-  }
-
-  let initialOutput = createOutput();
-  (initialOutput as any)[Subscribe] = function (_updateInput: (data: any) => void) {
-    updateInput = () => _updateInput(createOutput());
-    if (hasUpdate) {
-      updateInput();
-      hasUpdate = false;
-    }
-
-    return function stop() {
-      handles.forEach(handle => handle.stop());
-    }
-  }
-
-  return initialOutput;
 }
