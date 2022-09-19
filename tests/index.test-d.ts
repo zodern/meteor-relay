@@ -150,8 +150,8 @@ expectType<(s: string) => Promise<string | null>>(createMethod({
 }).pipeline(
   (input, context) => context.name,
   (input, context) => {
-    context.onError((err) => new Error('test'));
-    context.onResult((result) => console.log(result));
+    context.onError((err: any) => new Error('test'));
+    context.onResult((result: any) => console.log(result));
     context.type.substring(0, 5);
 
     return input;
@@ -241,8 +241,8 @@ expectType<Meteor.SubscriptionHandle>(createPublication({
 }).pipeline(
   (input, context) => context.name,
   (input, context) => {
-    context.onError((err) => new Error('test'));
-    context.onResult((result) => console.log(result));
+    context.onError((err: any) => new Error('test'));
+    context.onResult((result: any) => console.log(result));
     context.type.substring(0, 5);
 
     return input;
