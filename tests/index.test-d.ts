@@ -17,7 +17,7 @@ const objMethod = createMethod({
     b: z.string()
   }),
   run() {
-    return true; 
+    return true;
   }
 });
 
@@ -40,21 +40,41 @@ const anyMethod = createMethod({
 const pipelineMethod = createMethod({
   name: 'test5',
   schema: z.number(),
-  run: [
-    (i) => i + 5,
-    (i) => i - 1,
-    (i) => i / 2
-  ]
-});
-const asyncMethod = createMethod({
+}).pipeline(
+  (i) => i + 5,
+  (i) => i - 1,
+  (i) => i / 2
+);
+
+const asyncPipeline = createMethod({
   name: 'test5',
-  schema: z.number(),
-  run: [
-    async (i) => i + 5,
-    (i) => i - 1,
-    (i) => i / 2
-  ]
-});
+  schema: z.number()
+}).pipeline(
+  async (i) => i + 5,
+  (i) => i - 1,
+  (i) => i / 2
+);
+
+
+function reusableStep<I>(input: I) {
+  return input;
+}
+
+const reusableMethod = createMethod({
+  name: 'test7',
+  schema: z.object({ a: z.number(), b: z.string() })
+}).pipeline(
+  (input) => input,
+  reusableStep,
+  (i) => i,
+);
+
+const undefinedPipeline = createMethod({
+  name: 'test8',
+  schema: z.undefined()
+}).pipeline(
+  () => 5
+);
 
 expectType<Promise<number>>(undefinedMethod());
 expectError(undefinedMethod(5));
@@ -74,7 +94,12 @@ expectType<Promise<string>>(anyMethod('123'));
 expectType<Promise<number>>(pipelineMethod(20));
 expectError(pipelineMethod('5'));
 
-expectType<Promise<number>>(asyncMethod(20));
+expectType<Promise<number>>(asyncPipeline(20));
+
+expectType<number>(partial({ a: 5 }));
+expectError(partial({ a: 'a' }));
+
+expectType<number>(partialAsync({ a: 5 }));
 
 
 const undefinedSubscribe = createPublication({

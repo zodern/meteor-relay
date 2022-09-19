@@ -1,7 +1,7 @@
 import type * as z from "zod";
 import type { Subscription } from 'meteor/meteor';
 import type { Mongo } from 'meteor/mongo';
-import type { CreateMethod, CreatePublication, SubscriptionCallbacks } from './types'
+import type { CreateMethodPipeline, CreatePubPipeline, SubscriptionCallbacks } from './types'
 
 const Subscribe = Symbol('zodern:relay:subscribe');
 
@@ -9,16 +9,22 @@ function isThenable(possiblePromise: any): possiblePromise is Promise<any> {
   return possiblePromise && typeof possiblePromise.then === 'function';
 }
 
-export const createMethod: CreateMethod = function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config: {
+export function createMethod <S extends z.ZodTypeAny, T > (
+  config: { name: string, schema: S, rateLimit ?: { interval: number, limit: number }, run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
+): (...args: S extends z.ZodUndefined ? [] : [z.input<S>]) => Promise<T>
+export function createMethod <S extends z.ZodTypeAny>(
+  config: { name: string, schema: S, rateLimit ?: { interval: number, limit: number } }
+) : { pipeline: CreateMethodPipeline<z.output<S>> }
+export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config: {
   name: string;
   schema: S,
   rateLimit?: {
     interval: number,
     limit: number
   },
-  run: ((args: any, context: any) => any)[] | ((this: Meteor.MethodThisType, args: z.output<S>) => T)
-}) {
-  let pipeline: any = config.run;
+  run?: ((this: Meteor.MethodThisType, args: z.output<S>) => T)
+}): any {
+  let pipeline: any = [];
 
   if (typeof config.run === 'function') {
     pipeline = [config.run];
@@ -26,6 +32,10 @@ export const createMethod: CreateMethod = function createMethod<S extends z.ZodU
 
   Meteor.methods({
     [config.name](data) {
+      if (pipeline.length === 0) {
+        throw new Error(`Pipeline or run function for ${config.name} never configured`);
+      }
+
       let parsed: z.output<S> = config.schema.parse(data);
       let self = this;
 
@@ -71,12 +81,23 @@ export const createMethod: CreateMethod = function createMethod<S extends z.ZodU
 
   call.config = config;
 
-  return call;
+  if (config.run) {
+    return call;
+  }
+
+  return {
+    pipeline(newPipeline: any) {
+      pipeline = newPipeline;
+      return call;
+    }
+  };
 }
 
-export const createPublication: CreatePublication = function createPublication<S extends z.ZodTypeAny, T>(
-  config: { name: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run: ((this: Subscription, args: z.output<S>) => T) | ((args: any, context: any) => any)[] }
-) {
+export function createPublication<S extends z.ZodTypeAny, T>(config: { name: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run: (this: Subscription, args: z.output<S>) => T }): (...args: z.output<S> extends undefined ? [SubscriptionCallbacks?] : [z.output<S>, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle
+export function createPublication<S extends z.ZodTypeAny, R1,> (config: { name: string | null, schema: S, rateLimit ?: { interval: number, limit: number } }): { pipeline: CreatePubPipeline<z.output<S>> }
+export function createPublication<S extends z.ZodTypeAny, T>(
+  config: { name: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run?: ((this: Subscription, args: z.output<S>) => T) }
+): any {
   let pipeline: any = config.run;
 
   if (typeof config.run === 'function') {
@@ -84,6 +105,10 @@ export const createPublication: CreatePublication = function createPublication<S
   }
 
   Meteor.publish(config.name, function (data: z.input<S>) {
+    if (pipeline.length === 0) {
+      throw new Error(`Pipeline or run function never configured for ${config.name} publication`);
+    }
+
     let self = this;
     let parsed: z.output<S> = config.schema.parse(data);
     let stopPipelineSubscriptions: (() => void)[] = [];
@@ -290,7 +315,16 @@ export const createPublication: CreatePublication = function createPublication<S
 
   subscribe.config = config;
 
-  return subscribe;
+  if (config.run) {
+    return subscribe;
+  }
+
+  return {
+    pipeline(newPipeline: any) {
+      pipeline = newPipeline;
+      return subscribe;
+    }
+  };
 }
 
 export function withCursors<I extends object, T extends Record<string, Mongo.Cursor<any>>> (input: I, cursors: T):

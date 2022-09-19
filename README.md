@@ -204,18 +204,19 @@ export const getTasks = createMethod({
   schema: z.object({
     tag: z.string().optional()
     status: z.string().optional(),
-  }),
-  run: [ 
-    (input) => ({ ...input, status: input.status || 'new' }),
-    pickOrganization,
-    ({ tag, status, organizationId }) => {
-      return Tasks.find({ organizationId, status, tag }).fetch();
-    }
-  ]
-});
+  })
+}).pipeline(
+  (input) => ({ ...input, status: input.status || 'new' }),
+  pickOrganization,
+  ({ tag, status, organizationId }) => {
+    return Tasks.find({ organizationId, status, tag }).fetch();
+  }
+);
 ```
 
-This method has 3 steps in the pipeline. The first step takes the data sent from the client, and then returns an object with the status set to a default value. The next step takes that as the input, and then adds an `organizationId` property. The final step uses the completed input, and returns some documents from the database. Since this is the last step, its return value is sent to the client.
+Pipelines are configured by calling the `pipeline` function returned by `createMethod`. The `pipeline` function is only available when `run` function is not configured.
+
+Each argument passed to the `pipeline` function is a step in the pipeline. This method has 3 steps in the pipeline. The first step takes the data sent from the client, and then returns an object with the status set to a default value. The next step takes that as the input, and then adds an `organizationId` property. The final step uses the completed input, and returns some documents from the database. Since this is the last step, its return value is sent to the client.
 
 Benefits of pipelines:
 - Allows you to break complicated methods and publications into multiple steps
@@ -256,28 +257,28 @@ function pipelineStep<T extends { projectId: string }>(input: T) {
 }
 ```
 
-### Partial Pipelines
-
-Partial pipelines are reusable arrays of pipeline steps. If you are adding the same list of pipeline steps to many methods or publications, partial pipelines can make it easier:
+If you are using the same group of pipeline steps for multiple methods or publications, you can create partial pipelines. Partial pipelines are created using the `partialPipeline` function:
 
 ```ts
 import { partialPipeline } from 'meteor/zodern:relay';
 
-let adminPipeline = partialPipeline([
+let adminPipeline = partialPipeline(
   requireAdmin,
   unblock,
   auditAdmin
-]);
+);
 
 export const listUsers = createMethod({
   name: 'listUsers',
-  schema: z.undefined(),
-  run: [ 
-    adminPipeline,
-    () => Users.find().fetch();
-  ]
-});
+  schema: z.undefined()
+}).pipeline(
+  (input) => input,
+  adminPipeline,
+  () => Users.find().fetch();
+);
 ```
+
+For typescript to infer the types correctly in reusable steps or partial pipelines, they can not be used as the first step in the pipeline. As in the example above, you can have the first step be a simple function that returns the input. This then allows typescript to correctly infer the return type of `adminPipeline`.
 
 ### Pipeline step arguments
 
@@ -322,15 +323,15 @@ If you have a step you want to run before or after every method or publication, 
 ```ts
 import { setGlobalMethodsPipeline, setGlobalPublicationPipeline } from 'meteor/zodern:relay';
 
-setGlobalPipeline([
+setGlobalPipeline(
   auditMethods,
   logStatus
-]);
+);
 
-setGlobalPublicationPipeline([
+setGlobalPublicationPipeline(
   auditPublications,
   logStatus
-]);
+);
 ```
 
 ### Reactive Publication Pipelines
@@ -359,19 +360,18 @@ createMethod({
   schema: z.object({
     organization: z.string()
   }),
-  run: [ 
-    (input) => {
-      let cursor = Projects.find({ owner: Meteor.userId(), organization: input.organization });
+}).pipeline(
+  (input) => {
+    let cursor = Projects.find({ owner: Meteor.userId(), organization: input.organization });
 
-      return withCursors(input, { projects: cursor });
-    },
-    (input) => {
-      let projectIds = input.projects.map(project => project._id);
+    return withCursors(input, { projects: cursor });
+  },
+  (input) => {
+    let projectIds = input.projects.map(project => project._id);
 
-      return Tasks.find({ project: { $in: projectIds } });
-    }
-  ]
-});
+    return Tasks.find({ project: { $in: projectIds } });
+  }
+);
 ```
 
 The first step of the pipeline creates a cursor to find all projects the user owns. This cursor is passed in the second object to `withCursors`, with the key `projects`.
@@ -385,24 +385,23 @@ Here is an example showing reacting to permission changes:
 ```ts
 createMethod({
   name: 'adminListUsers',
-  schema: z.undefined(),
-  run: [ 
-    (input) => {
-      const user = Meteor.users.find({_id: Meteor.userId()});
+  schema: z.undefined()
+}).pipeline(
+  (input) => {
+    const user = Meteor.users.find({_id: Meteor.userId()});
 
-      return withCursors(input, { user })
-    },
-    (input) => {
-      const [ user ] = input.user;
+    return withCursors(input, { user })
+  },
+  (input) => {
+    const [ user ] = input.user;
 
-      if (user.isAdmin) {
-        return Users.find().fetch();
-      }
-
-      return [];
+    if (user.isAdmin) {
+      return Users.find().fetch();
     }
-  ]
-});
+
+    return [];
+  }
+);
 ```
 
 The first step of the pipeline creates a cursor to get the doc for the current user. The second step then uses the doc to check if the user is an admin to decide if it should publish the data. If the user's doc is later modified so they are no longer an admin, the second step of the pipeline will then re-run, allowing it to stop publishing any data.
