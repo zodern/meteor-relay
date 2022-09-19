@@ -1,5 +1,5 @@
 import {
-  subscribeBasic, subscribeError, subscribeFast, subscribePipeline, subscribeRateLimited, subscribeReactivePipeline, subscribeSlow
+  subscribeBasic, subscribeError, subscribeFast, subscribePartial, subscribePipeline, subscribeRateLimited, subscribeReactivePipeline, subscribeSlow
 } from './publications/index';
 import {
   createPublication
@@ -92,6 +92,19 @@ Tinytest.addAsync('publications - pipeline', (test, done) => {
         sub.stop();
         let events = await getEvents();
         test.equal(events, ['input: 10', 'complete: 20'])
+        done();
+      }
+    });
+});
+
+Tinytest.addAsync('publications - partial', (test, done) => {
+  let sub = subscribePartial(
+    3.33,
+    {
+      async onReady() {
+        sub.stop();
+        let events = await getEvents();
+        test.equal(events, ['complete: 6.7'])
         done();
       }
     });

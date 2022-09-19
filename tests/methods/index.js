@@ -1,5 +1,5 @@
 const { z } = require('zod');
-import { createMethod } from 'meteor/zodern:relay';
+import { createMethod, partialPipeline } from 'meteor/zodern:relay';
 
 export const test1 = createMethod({
   name: 'test1',
@@ -81,6 +81,21 @@ export const asyncPipeline = createMethod({
   async (n) => n + 0.5
 );
 
+const partial = partialPipeline(
+  (i) => i + 10,
+  (i) => i / 2
+);
+
+const partial2 = partialPipeline(partial);
+
+export const partialMethod = createMethod({
+  name: 'partial',
+  schema: z.number()
+}).pipeline(
+  partial2,
+  (i) => i.toFixed(1)
+);
+
 let events = [];
 
 export function recordEvent(text) {
@@ -97,4 +112,4 @@ export const getEvents = createMethod({
   run() {
     return events;
   }
-})
+});

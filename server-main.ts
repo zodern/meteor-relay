@@ -2,6 +2,9 @@ import type * as z from "zod";
 import type { Subscription } from 'meteor/meteor';
 import type { Mongo } from 'meteor/mongo';
 import type { CreateMethodPipeline, CreatePubPipeline, SubscriptionCallbacks } from './types'
+import { flattenPipeline, partialPipeline } from './pipeline-helpers';
+
+export { partialPipeline };
 
 const Subscribe = Symbol('zodern:relay:subscribe');
 
@@ -87,7 +90,7 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
 
   return {
     pipeline(..._pipeline: any[]) {
-      pipeline = _pipeline;
+      pipeline = flattenPipeline(_pipeline);
       return call;
     }
   };
@@ -321,7 +324,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
   return {
     pipeline(..._pipeline: any[]) {
-      pipeline = _pipeline;
+      pipeline = flattenPipeline(_pipeline);
       return subscribe;
     }
   };

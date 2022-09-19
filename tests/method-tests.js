@@ -9,7 +9,8 @@ const {
   configMethod,
   simplePipeline,
   asyncPipeline,
-  methodUnblock
+  methodUnblock,
+  partialMethod
 } = require('./methods/index.js');
 
 Tinytest.addAsync('methods - basic', async (test) => {
@@ -92,4 +93,10 @@ Tinytest.addAsync('methods - async pipeline', async (test) => {
   const result = await asyncPipeline(10)
 
   test.equal(result, 14.5);
+});
+
+Tinytest.addAsync('methods - partial pipeline', async (test) => {
+  const result = await partialMethod(3.33)
+
+  test.equal(result, '6.7');
 });

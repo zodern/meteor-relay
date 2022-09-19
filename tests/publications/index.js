@@ -1,4 +1,4 @@
-import { createPublication, withCursors } from 'meteor/zodern:relay';
+import { createPublication, withCursors, partialPipeline } from 'meteor/zodern:relay';
 import { recordEvent, resetEvents } from '../methods/index';
 const { z } = require('zod');
 
@@ -65,3 +65,22 @@ export const subscribePipeline = createPublication({
     }
   ]
 });
+
+const partial = partialPipeline(
+  (i) => i + 10,
+  (i) => i / 2
+)
+
+export const subscribePartial = createPublication({
+  name: 'partial',
+  schema: z.number()
+}).pipeline(
+  (i) => {
+    resetEvents();
+    return i;
+  },
+  partial,
+  (i) => i.toFixed(1),
+  (i) => recordEvent(`complete: ${i}`),
+  () => []
+);
