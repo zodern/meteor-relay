@@ -236,6 +236,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     let needsRun = false;
     let isRunning = false;
     let subStopped = false;
+    let stopPipeline = false;
 
     this.onStop(() => {
       subStopped = true;
@@ -249,6 +250,27 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     function stop() {
       stopPipelineSubscriptions.forEach((func) => func && func());
       handles.forEach(handle => handle.stop());
+    }
+
+    let onResult: ((result: any) => void)[] = [];
+    let onError: ((err: any) => any)[] = [];
+    let context: PipelineContext<z.output<S>> = {
+      originalInput: parsed,
+      type: 'publication',
+      name: config.name,
+      onResult(callback: (result: any) => void) {
+        onResult.push(callback);
+      },
+      onError(callback: (error: any) => any) {
+        onError.push(callback);
+      },
+      stop() {
+        stopPipeline = true;
+        self.ready();
+
+        stopPipelineSubscriptions.forEach(func => func && func());
+        stopPipelineSubscriptions = [];
+      }
     }
 
     async function run() {
@@ -269,9 +291,17 @@ export function createPublication<S extends z.ZodTypeAny, T>(
         let stopPrevious = stopPipelineSubscriptions[index];
         if (stopPrevious) stopPrevious();
 
-        let result = func.call(self, inputs[index]);
+        if (stopPipeline) {
+          break;
+        }
+
+        let result = func.call(self, inputs[index], context);
         if (isThenable(result)) {
           result = await result;
+        }
+
+        if (stopPipeline) {
+          break;
         }
 
         inputs[index + 1] = result;
@@ -306,11 +336,12 @@ export function createPublication<S extends z.ZodTypeAny, T>(
         scheduleRun();
       }
 
+      let output = inputs[pipeline.length];
+      let forwardOutput = false;
+
       if (stopPipelineSubscriptions.length > 0) {
         // The pipeline is reactive
         // We have to handle publishing cursors ourselves
-
-        let output = inputs[pipeline.length];
 
         // Meteor checks for _publishedCursor to identify cursors
         if (output && !Array.isArray(output) && output._publishCursor) {
@@ -319,11 +350,30 @@ export function createPublication<S extends z.ZodTypeAny, T>(
           publishCursors(inputs[pipeline.length]);
         }
       } else {
-        return inputs[pipeline.length];
+        forwardOutput = true;
       }
+
+      return {
+        output,
+        forwardOutput
+      };
     }
 
-    return (Promise as any).await(run());
+    try {
+      const result = (Promise as any).await(run());
+
+      onResult.forEach(cb => {
+        cb(result.output);
+      });
+
+      return result.forwardOutput ? result.output : undefined;
+    } catch(error) {
+      error = onError.reduce((err, callback) => {
+        return callback(err) ?? err;
+      }, error);
+
+      throw error;
+    }
   });
 
   if (config.rateLimit) {

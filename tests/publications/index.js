@@ -1,6 +1,7 @@
 import { createPublication, withCursors, partialPipeline } from 'meteor/zodern:relay';
 import { recordEvent, resetEvents } from '../methods/index';
 const { z } = require('zod');
+import assert from 'assert';
 
 export const subscribeBasic = createPublication({
   name: 'basic',
@@ -83,4 +84,51 @@ export const subscribePartial = createPublication({
   (i) => i.toFixed(1),
   (i) => recordEvent(`complete: ${i}`),
   () => []
+);
+
+export const subscribeContext = createPublication({
+  name: 'context',
+  schema: z.number()
+}).pipeline(
+  (input, context) => {
+    resetEvents();
+    return true
+  },
+  (input, context) => {
+    assert.equal(input, true);
+    assert.equal(typeof context.originalInput, 'number');
+    assert.equal(context.type, 'publication');
+    assert.equal(context.name, 'context');
+
+    context.onResult(r => {
+      recordEvent(`result: ${JSON.stringify(r)}`);
+    });
+
+    return [];
+  }
+);
+
+export const subscribeFailedContext = createPublication({
+  name: 'contextFailed',
+  schema: z.number()
+}).pipeline(
+  (input, context) => {
+    resetEvents();
+    context.onError(err => {
+      recordEvent(err.message);
+    });
+    context.onError(err => {
+      recordEvent(err.message);
+      return new Meteor.Error('second err');
+    });
+    context.onError(err => {
+      recordEvent(err.message);
+    });
+    context.onResult(() => {
+      recordEvent('result');
+    });
+  },
+  () => {
+    throw new Error('first err');
+  }
 );

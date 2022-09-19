@@ -1,5 +1,5 @@
 import {
-  subscribeBasic, subscribeError, subscribeFast, subscribePartial, subscribePipeline, subscribeRateLimited, subscribeReactivePipeline, subscribeSlow
+  subscribeBasic, subscribeContext, subscribeError, subscribeFailedContext, subscribeFast, subscribePartial, subscribePipeline, subscribeRateLimited, subscribeReactivePipeline, subscribeSlow
 } from './publications/index';
 import {
   createPublication
@@ -28,11 +28,11 @@ Tinytest.addAsync('publications - args with options', (test, done) => {
   let sub = subscribeBasic(
     'input',
     {
-    onReady() {
-      sub.stop();
-      done();
-    }
-  });
+      onReady() {
+        sub.stop();
+        done();
+      }
+    });
 });
 
 Tinytest.add('publications - config client', async (test) => {
@@ -63,7 +63,7 @@ Tinytest.addAsync('publications - async block by default', (test, done) => {
   });
 
   subscribeFast({
-    onReady(){
+    onReady() {
       order.push('fast');
       test.equal(order, ['slow', 'fast']);
       done();
@@ -105,6 +105,33 @@ Tinytest.addAsync('publications - partial', (test, done) => {
         sub.stop();
         let events = await getEvents();
         test.equal(events, ['complete: 6.7'])
+        done();
+      }
+    });
+});
+
+Tinytest.addAsync('publications - context', (test, done) => {
+  let sub = subscribeContext(
+    3.33,
+    {
+      async onReady() {
+        sub.stop();
+        let events = await getEvents();
+        test.equal(events, ['result: []'])
+        done();
+      }
+    });
+});
+
+Tinytest.addAsync('publications - context onError', (test, done) => {
+  let sub = subscribeFailedContext(
+    3.33,
+    {
+     async onStop(err) {
+        test.equal(err.message, '[second err]');
+
+        let events = await getEvents();
+        test.equal(events, ['first err', 'first err', '[second err]']);
         done();
       }
     });

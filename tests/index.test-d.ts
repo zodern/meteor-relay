@@ -234,3 +234,17 @@ expectType<Meteor.SubscriptionHandle>(undefinedSubscribe({
 }));
 
 expectType<Meteor.SubscriptionHandle>(stringSubscribe('fun3', {}));
+
+expectType<Meteor.SubscriptionHandle>(createPublication({
+  name: 'fun',
+  schema: z.string()
+}).pipeline(
+  (input, context) => context.name,
+  (input, context) => {
+    context.onError((err) => new Error('test'));
+    context.onResult((result) => console.log(result));
+    context.type.substring(0, 5);
+
+    return input;
+  }
+)('test'));
