@@ -1,4 +1,10 @@
-export function _createClientMethod(name: string) {
+export function _createClientMethod(name: string, stub: Function) {
+  if (stub) {
+    Meteor.methods({
+      [name]: stub as any
+    });
+  }
+
   function call(args: any) {
     return new Promise((resolve, reject) => {
       Meteor.apply(

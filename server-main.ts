@@ -29,7 +29,11 @@ export function setGlobalPublicationPipeline(
 }
 
 export function createMethod <S extends z.ZodTypeAny, T > (
-  config: { name?: string, schema: S, rateLimit ?: { interval: number, limit: number }, run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
+  config: {
+    name?: string, schema: S,
+    rateLimit ?: { interval: number, limit: number },
+    stub?: boolean | ((this: Meteor.MethodThisType, args: z.output<S>) => any),
+    run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
 ): (...args: S extends z.ZodUndefined ? [] : [z.input<S>]) => Promise<T>
 export function createMethod <S extends z.ZodTypeAny>(
   config: { name?: string, schema: S, rateLimit ?: { interval: number, limit: number } }
@@ -37,6 +41,7 @@ export function createMethod <S extends z.ZodTypeAny>(
 export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config: {
   name?: string;
   schema: S,
+  stub?: any, 
   rateLimit?: {
     interval: number,
     limit: number

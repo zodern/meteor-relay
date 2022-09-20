@@ -16,6 +16,7 @@ describe('Plugin', () => {
     const code = 'const example = "Hello";';
     assert.equal(transform(code), '');
   });
+
   it('should ignore various types of exports', () => {
     const code = `
       export const a = true;
@@ -42,7 +43,7 @@ export default createMethod({
       assert.equal(transform(code, '/methods/index.js', 'os.osx.x86_64'), code.trim());
     });
     it('should add missing names on the server', () => {
-        const code = `
+      const code = `
 import { createMethod } from 'meteor/zodern:relay';
 export const createProject = createMethod({
 });
@@ -50,7 +51,7 @@ export default createMethod({
   
 });
       `;
-        const expected = `
+      const expected = `
 import { createMethod } from 'meteor/zodern:relay';
 export const createProject = createMethod({
   name: "createProjectM000bd"
@@ -59,7 +60,7 @@ export default createMethod({
   name: "projectsM000bd"
 });
       `;
-        assert.equal(transform(code, '/methods/projects.js', 'os.osx.x86_64'), expected.trim());
+      assert.equal(transform(code, '/methods/projects.js', 'os.osx.x86_64'), expected.trim());
     });
 
     it('should add missing names on the client', () => {
@@ -127,6 +128,94 @@ export default _createClientMethod("method2");
       `
 
       assert.equal(transform(code), '');
+    });
+
+    describe.only('stubs', () => {
+      it('should use run function as stub', () => {
+        const code = `
+        import assert from 'assert';
+        import { createMethod } from 'meteor/zodern:relay';
+        import { generate } from '../generate';
+
+        export const myMethod = createMethod({
+          name: 'myMethod',
+          stub: true,
+          run(b) {
+            generate();
+            let a = 10;
+            return 5 + a;
+          }
+        });
+
+        export default createMethod({
+          name: 'myMethod',
+          stub: true,
+          run: (b) => {
+            generate();
+            assert.equals(10, 10);
+          }
+        });
+      `
+
+        assert.equal(transform(code), `
+        import { _createClientMethod } from "meteor/zodern:relay/client";
+import { generate } from "../generate";
+export const myMethod = _createClientMethod("myMethod", function (b) {
+  generate();
+  let a = 10;
+  return 5 + a;
+});
+import { generate } from "../generate";
+import assert from "assert";
+export default _createClientMethod("myMethod", b => {
+  generate();
+  assert.equals(10, 10);
+});
+      `.trim());
+      });
+
+      it('should use stub function as stub', () => {
+        const code = `
+        import assert from 'assert';
+        import { createMethod } from 'meteor/zodern:relay';
+        import { generate } from '../generate';
+
+        export const myMethod = createMethod({
+          name: 'myMethod',
+          stub(b) {
+            generate();
+            let a = 10;
+            return 5 + a;
+          },
+          run() {}
+        });
+
+        export default createMethod({
+          name: 'myMethod',
+          stub: (b) => {
+            generate();
+            assert.equals(10, 10);
+          },
+          run() {}
+        });
+      `
+
+        assert.equal(transform(code), `
+        import { _createClientMethod } from "meteor/zodern:relay/client";
+import { generate } from "../generate";
+export const myMethod = _createClientMethod("myMethod", function (b) {
+  generate();
+  let a = 10;
+  return 5 + a;
+});
+import { generate } from "../generate";
+import assert from "assert";
+export default _createClientMethod("myMethod", b => {
+  generate();
+  assert.equals(10, 10);
+});
+      `.trim());
+      });
     });
   });
 

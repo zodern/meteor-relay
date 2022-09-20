@@ -15,7 +15,9 @@ const {
   getEvents,
   contextFailedMethod,
   globalPipelineMethod,
-  unnamedMethod
+  unnamedMethod,
+  stubMethod,
+  stubRunMethod
 } = require('./methods/index.js');
 
 Tinytest.addAsync('methods - basic', async (test) => {
@@ -127,11 +129,25 @@ Tinytest.addAsync('methods - context error', async (test) => {
 });
 
 Tinytest.addAsync('methods - global pipeline', async (test) => {
-    const result = await globalPipelineMethod(5);
-    test.equal(result, 6);
+  const result = await globalPipelineMethod(5);
+  test.equal(result, 6);
 });
 
 Tinytest.addAsync('methods - unnamed method', async (test) => {
   const result = await unnamedMethod(10);
   test.equal(result, 5);
 });
+
+if (Meteor.isClient) {
+  Tinytest.addAsync('methods - run as stub', async (test) => {
+    window.stub = false;
+    stubRunMethod(10);
+    test.equal(window.stub, true);
+  });
+
+  Tinytest.addAsync('methods - stub method', async (test) => {
+    window.stub = false;
+    stubMethod(10);
+    test.equal(window.stub, true);
+  });
+}

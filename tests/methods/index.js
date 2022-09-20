@@ -166,6 +166,28 @@ export const unnamedMethod = createMethod({
   }
 });
 
+export const stubRunMethod = createMethod({
+  schema: z.number(),
+  stub: true,
+  run(input) {
+    if (Meteor.isClient) {
+      window.stub = true;
+    }
+    return input / 2;
+  }
+});
+
+export const stubMethod = createMethod({
+  schema: z.number(),
+  stub: true,
+  run(input) {
+    if (Meteor.isClient) {
+      window.stub = true;
+    }
+    return input / 2;
+  }
+});
+
 // Used for publication tests
 
 export const Numbers = new Mongo.Collection('numbers');

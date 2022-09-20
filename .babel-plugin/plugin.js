@@ -4,17 +4,18 @@ const path = require('path');
 // If has a MemberExpression, returns the first call expression in its callee
 // Otherwise, returns the call expression
 function getFirstCallExpr(call) {
-  if (call.callee.type === 'MemberExpression') {
-    if (
-      call.callee.object.type !== 'CallExpression'
-    ) {
-      return '';
-    }
-
-    return  call.callee.object;
+  if (call.node.callee.type !== 'MemberExpression') {
+    return call;
   }
 
-  return call;
+
+  if (
+    call.node.callee.object.type !== 'CallExpression'
+  ) {
+    return;
+  }
+
+  return call.get('callee.object');
 }
 
 module.exports = function (api) {
@@ -25,12 +26,29 @@ module.exports = function (api) {
     caller = c;
   });
 
-  function createExport(exportName, callee, name) {
+  function createExport(exportName, callee, name, stub) {
+    let args = [
+      t.StringLiteral(name)
+    ];
+
+    if (stub) {
+      if (stub.type === 'ObjectMethod') {
+        stub = t.FunctionExpression(
+          null,
+          stub.node.params || [],
+          stub.node.body,
+          stub.node.generator,
+          stub.node.async
+        )
+      } else if (stub.type === 'ObjectProperty') {
+        stub = stub.node.value;
+      }
+      args.push(stub);
+    }
+
     const declaration = t.CallExpression(
       t.Identifier(callee),
-      [
-        t.StringLiteral(name)
-      ]
+      args
     );
 
     if (exportName === null) {
@@ -77,7 +95,7 @@ module.exports = function (api) {
       .digest('hex')
       .substring(0, 5);
 
-    let name= exportName;
+    let name = exportName;
 
     if (name === null) {
       let baseName = path.basename(filePath);
@@ -101,6 +119,57 @@ module.exports = function (api) {
     return name;
   }
 
+  // TODO: args should be a path instead of node
+  function findStubPropertyIndex(args) {
+    let obj = args[0];
+    let stubPropIndex = obj.properties.findIndex((property) => {
+      if (property.key.type !== 'Identifier') {
+        return false;
+      }
+
+      if (property.key.name !== 'stub') {
+        return false;
+      }
+
+      return true;
+    });
+    let stub = obj.properties[stubPropIndex];
+
+    if (!stub) {
+      return -1;
+    }
+
+    if (
+       stub.type === 'ObjectMethod' ||
+      stub.value.type === 'FunctionExpression' ||
+      stub.value.type === 'ArrowFunctionExpression'
+    ) {
+      return stubPropIndex;
+    }
+
+
+    if (stub.value.type !== 'BooleanLiteral') {
+      return -1;
+    }
+
+    if (stub.value.value !== true) {
+      return -1;
+    }
+
+    // stub is set to true - use the run function
+    return obj.properties.findIndex((property) => {
+      if (property.key.type !== 'Identifier') {
+        return false;
+      }
+
+      if (property.key.name !== 'run') {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
   let canHaveMethods = false;
   let canHavePublications = false;
   let createMethodName = null;
@@ -109,6 +178,7 @@ module.exports = function (api) {
   let publications = [];
   let isServer = false;
   let filePath = ''
+  let imports = Object.create(null);
 
   return {
     visitor: {
@@ -128,7 +198,7 @@ module.exports = function (api) {
           isServer = caller.arch.startsWith('os.');
         },
         exit(path) {
-          if (isServer ||!canHaveMethods && !canHavePublications) {
+          if (isServer || !canHaveMethods && !canHavePublications) {
             return;
           }
 
@@ -159,10 +229,39 @@ module.exports = function (api) {
           body.push(importDecl);
 
           methods.forEach(method => {
+            if (method.stub) {
+              let stubBody = method.stub.get('body').node ?
+                method.stub.get('body') : method.stub.get('value.body');
+              stubBody.traverse({
+                ReferencedIdentifier(subPath) {
+                  if (stubBody.scope.hasOwnBinding(subPath.node.name)) {
+                    return;
+                  }
+
+                  if (subPath.node.name in imports) {
+                    let importDesc = imports[subPath.node.name];
+
+                    let specifier = importDesc.importName === null ?
+                      t.ImportDefaultSpecifier(t.Identifier(subPath.node.name)) :
+                      t.ImportSpecifier(
+                        t.Identifier(importDesc.importName),
+                        t.Identifier(subPath.node.name)
+                      );
+
+                    body.push(t.ImportDeclaration(
+                      [ specifier ],
+                      t.StringLiteral(importDesc.source)
+                    ));
+                  }
+                }
+              });
+            }
+
             body.push(
-              createExport(method.export, '_createClientMethod', method.name)
+              createExport(method.export, '_createClientMethod', method.name, method.stub)
             );
           });
+
           publications.forEach(publication => {
             body.push(
               createExport(publication.export, '_createClientPublication', publication.name)
@@ -175,11 +274,18 @@ module.exports = function (api) {
         },
       },
       ImportDeclaration(path) {
-        if (path.node.source.value !== 'meteor/zodern:relay') {
-          return;
-        }
-
         path.node.specifiers.forEach(specifier => {
+          imports[specifier.local.name] = {
+            importName: specifier.type === 'ImportDefaultSpecifier' ?
+              null :
+              specifier.imported.name,
+            source: path.node.source.value
+          };
+
+          if (specifier.type === 'ImportDefaultSpecifier') {
+            return;
+          }
+
           if (canHaveMethods && specifier.imported.name === 'createMethod') {
             createMethodName = specifier.local.name;
           }
@@ -193,16 +299,16 @@ module.exports = function (api) {
           return;
         }
 
-        let call = getFirstCallExpr(path.node.declaration);
+        let call = getFirstCallExpr(path.get('declaration'));
 
         if (!call) {
           return;
         }
 
         if (
-          call.callee.name === createMethodName
+          call.node.callee.name === createMethodName
         ) {
-          let name = getOrAddName(call.arguments, {
+          let name = getOrAddName(call.node.arguments, {
             exportName: null,
             filePath,
             isPub: false
@@ -210,16 +316,22 @@ module.exports = function (api) {
           if (name === undefined) {
             throw new Error('Unable to find name for createMethod');
           }
+          let stubPropIndex = findStubPropertyIndex(call.node.arguments);
+          if (stubPropIndex > -1) {
+            stub = call.get(`arguments.0.properties.${stubPropIndex}`);
+          }
+
           methods.push({
             name: name,
-            export: null
+            export: null,
+            stub
           });
         }
 
         if (
-         call.callee.name === createPublicationName
+          call.node.callee.name === createPublicationName
         ) {
-          let name = getOrAddName(call.arguments, {
+          let name = getOrAddName(call.node.arguments, {
             exportName: null,
             filePath,
             isPub: true
@@ -235,12 +347,12 @@ module.exports = function (api) {
         }
       },
       ExportNamedDeclaration(path) {
-        let declaration = path.node.declaration;
+        let declaration = path.get('declaration');
 
         if (
           // null when the code is something like "export { h };"
-          declaration === null ||
-          declaration.type === 'FunctionDeclaration'
+          !declaration.node ||
+          declaration.isFunctionDeclaration()
         ) {
           return;
         }
@@ -249,43 +361,49 @@ module.exports = function (api) {
           throw new Error(`export declarations of type ${declaration.type} are not supported`);
         }
 
-        declaration.declarations.forEach(vDeclaration => {
-          if (vDeclaration.type !== 'VariableDeclarator') {
-            throw new Error(`Unsupported declaration type in VariableDeclaration: ${vDeclaration.type}`);
+        declaration.get('declarations').forEach(vDeclaration => {
+          if (!vDeclaration.isVariableDeclarator()) {
+            throw new Error(`Unsupported declaration type in VariableDeclaration: ${vDeclaration.node.type}`);
           }
 
-          if (vDeclaration.init.type !== 'CallExpression') {
+          if (!vDeclaration.get('init').isCallExpression()) {
             return;
           }
 
-          let call = getFirstCallExpr(vDeclaration.init);
-          
+          let call = getFirstCallExpr(vDeclaration.get('init'));
+
           if (!call) {
             return;
           }
 
           if (
-            call.callee.name === createMethodName
+            call.node.callee.name === createMethodName
           ) {
-            let name = getOrAddName(call.arguments, {
-              exportName: vDeclaration.id.name,
+            let name = getOrAddName(call.node.arguments, {
+              exportName: vDeclaration.node.id.name,
               filePath,
               isPub: false
             });
             if (name === undefined) {
               throw new Error('Unable to find name for createMethod');
             }
+            let stubPropIndex = findStubPropertyIndex(call.node.arguments);
+            let stub;
+            if (stubPropIndex > -1) {
+              stub = call.get(`arguments.0.properties.${stubPropIndex}`);
+            }
             methods.push({
               name: name,
-              export: vDeclaration.id.name
+              export: vDeclaration.node.id.name,
+              stub
             });
           }
 
           if (
-            call.callee.name === createPublicationName
+            call.node.callee.name === createPublicationName
           ) {
-            let name = getOrAddName(call.arguments, {
-              exportName: vDeclaration.id.name,
+            let name = getOrAddName(call.node.arguments, {
+              exportName: vDeclaration.node.id.name,
               filePath,
               isPub: true
             });
@@ -295,7 +413,7 @@ module.exports = function (api) {
 
             publications.push({
               name: name,
-              export: vDeclaration.id.name
+              export: vDeclaration.node.id.name
             });
           }
         })

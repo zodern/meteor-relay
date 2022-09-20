@@ -411,4 +411,57 @@ The first step of the pipeline creates a cursor to get the doc for the current u
 
 ## Method Stubs
 
-`zodern:relay` currently doesn't have any built in support for method stubs. You can define method stubs as you would when not using `zodern:relay` in files outside of `methods` directories.
+By default, no code you write in `methods` directories will be kept on the client. However, you can mark specific methods that you want to also use as stubs on the client. In this case, `zodern:relay` only keeps two pieces of code on the client:
+
+- The stub function itself 
+- The specific imports used by the stub function
+
+To re-use the`run` function for a method as the stub on the client, you can set the `stub` option to `true`.
+
+```ts
+import { Tasks } from '/collections';
+import { createMethod } from 'meteor/zodern:relay';
+
+export const createTask = createMethod({
+  schema: z.string(),
+  stub: true,
+  run(name) {
+    Tasks.insert({ name, owner: Meteor.userId() });
+  }
+});
+```
+
+To use a different method for the stub, configure it using the `stop` property:
+
+```ts
+import { Tasks, Events } from '/collections';
+import { createMethod } from 'meteor/zodern:relay';
+
+export const createTask = createMethod({
+  schema: z.string(),
+  stub() {
+    Tasks.insert({ name, owner: Meteor.userId() });
+  },
+  run(name) {
+    checkPermissions(Meteor.userId());
+    Tasks.insert({ name, owner: Meteor.userId() });
+    sendEmail();
+    Events.insert({ type: 'task.add', user: Meteor.userId() })
+  }
+});
+```
+
+In the above example, only the stub function would be kept on the client:
+```ts
+  stub() {
+    Tasks.insert({ name, owner: Meteor.userId() });
+  }
+```
+
+Since this function uses the imported `Tasks`, that import will also be kept on the client:
+
+```ts
+import { Tasks } from '/collections';
+```
+
+> At this time, stubs are not supported for methods that use pipelines

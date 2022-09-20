@@ -109,6 +109,26 @@ const undefinedPipeline = createMethod({
   () => 5
 );
 
+const stubMethod = createMethod({
+  name: 'test4',
+  schema: z.undefined(),
+  // stub() {
+  //   return 10 / 2
+  // },
+  run() {
+    return 5;
+  }
+});
+
+const stubMethod2 = createMethod({
+  name: 'test5',
+  schema: z.undefined(),
+  stub: true,
+  run() {
+    return 20;
+  }
+});
+
 expectType<Promise<number>>(undefinedMethod());
 expectError(undefinedMethod(5));
 
@@ -167,6 +187,20 @@ expectType<(s: string) => Promise<string>>(createMethod({
     return context.originalInput
   }
 ));
+
+expectType<Promise<number>>(stubMethod(5));
+expectType<Promise<number>>(stubMethod2());
+expectError(createMethod({
+  schema: z.number(),
+  stub: true
+}));
+
+expectError(createMethod({
+  schema: z.number(),
+  stub() {
+    return 5;
+  }
+}));
 
 
 const undefinedSubscribe = createPublication({
