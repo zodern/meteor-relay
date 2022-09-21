@@ -130,10 +130,11 @@ export default _createClientMethod("method2");
       assert.equal(transform(code), '');
     });
 
-    describe.only('stubs', () => {
+    describe('stubs', () => {
       it('should use run function as stub', () => {
         const code = `
         import assert from 'assert';
+        import * as n from './namespace';
         import { createMethod } from 'meteor/zodern:relay';
         import { generate } from '../generate';
 
@@ -179,10 +180,12 @@ export default _createClientMethod("myMethod", b => {
         import assert from 'assert';
         import { createMethod } from 'meteor/zodern:relay';
         import { generate } from '../generate';
+        import * as n from './namespace';
 
         export const myMethod = createMethod({
           name: 'myMethod',
           stub(b) {
+            n.b();
             generate();
             let a = 10;
             return 5 + a;
@@ -202,8 +205,10 @@ export default _createClientMethod("myMethod", b => {
 
         assert.equal(transform(code), `
         import { _createClientMethod } from "meteor/zodern:relay/client";
+import * as n from "./namespace";
 import { generate } from "../generate";
 export const myMethod = _createClientMethod("myMethod", function (b) {
+  n.b();
   generate();
   let a = 10;
   return 5 + a;

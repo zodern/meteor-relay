@@ -245,13 +245,19 @@ module.exports = function (api) {
                   if (subPath.node.name in imports) {
                     let importDesc = imports[subPath.node.name];
 
-                    let specifier = importDesc.importName === null ?
-                      t.ImportDefaultSpecifier(t.Identifier(subPath.node.name)) :
-                      t.ImportSpecifier(
+                    let specifier;
+                    if (importDesc.type === 'ImportDefaultSpecifier') {
+                      specifier = t.ImportDefaultSpecifier(t.Identifier(subPath.node.name));
+                    } else if (importDesc.type === 'ImportNamespaceSpecifier') {
+                      specifier = t.ImportNamespaceSpecifier(t.Identifier(subPath.node.name));
+                    } else {
+                      specifier = t.ImportSpecifier(
                         t.Identifier(importDesc.importName),
                         t.Identifier(subPath.node.name)
                       );
+                    }
 
+                    // TODO: we should preserve the original order of the imports
                     body.push(t.ImportDeclaration(
                       [ specifier ],
                       t.StringLiteral(importDesc.source)
@@ -279,14 +285,18 @@ module.exports = function (api) {
       },
       ImportDeclaration(path) {
         path.node.specifiers.forEach(specifier => {
+          let type = specifier.type;
+          let hasImportName = type !== 'ImportDefaultSpecifier' &&
+            type !== 'ImportNamespaceSpecifier'
           imports[specifier.local.name] = {
-            importName: specifier.type === 'ImportDefaultSpecifier' ?
-              null :
-              specifier.imported.name,
+            type,
+            importName: hasImportName ?
+              specifier.imported.name :
+              null,
             source: path.node.source.value
           };
 
-          if (specifier.type === 'ImportDefaultSpecifier') {
+          if (!hasImportName) {
             return;
           }
 
@@ -321,6 +331,7 @@ module.exports = function (api) {
             throw new Error('Unable to find name for createMethod');
           }
           let stubPropIndex = findStubPropertyIndex(call.node.arguments);
+          let stub;
           if (stubPropIndex > -1) {
             stub = call.get(`arguments.0.properties.${stubPropIndex}`);
           }
