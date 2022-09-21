@@ -1,4 +1,5 @@
 const assert = require('assert');
+const path = require('path');
 
 const transform = (str, filename = '/methods/index.js', arch = 'web.browser') => {
   return require('@babel/core').transform(str, {
@@ -78,6 +79,23 @@ export const createProject = _createClientMethod("createProjectM000bd");
 export default _createClientMethod("projectsM000bd");
       `;
       assert.equal(transform(code, '/methods/projects.js'), expected.trim());
+    });
+
+    it('should work in top level methods folders', () => {
+      const code = `
+import { createMethod } from 'meteor/zodern:relay';
+export const createProject = createMethod({
+});
+export default createMethod({
+  
+});
+      `;
+      const expected = `
+import { _createClientMethod } from "meteor/zodern:relay/client";
+export const createProject = _createClientMethod("createProjectM169f1");
+export default _createClientMethod("projectsM169f1");
+      `;
+      assert.equal(transform(code, path.resolve(__dirname, '../methods/projects.js')), expected.trim());
     });
 
     it('should handle default exports', () => {
@@ -236,6 +254,16 @@ export default _createClientPublication("myPublication");
       `.trim());
     });
 
+    it('should handle publications folder in the app root', () => {
+      const code = `
+        import { createPublication } from 'meteor/zodern:relay';
+        export const myPublication = createPublication({ name: 'myPublication' });
+      `;
+      assert.equal(transform(code, path.resolve(__dirname, '../publications/index.js')), `
+import { _createClientPublication } from "meteor/zodern:relay/client";
+export const myPublication = _createClientPublication("myPublication");
+      `.trim());
+    });
     it('should handle named exports', () => {
       const code = `
         import { createPublication } from 'meteor/zodern:relay';

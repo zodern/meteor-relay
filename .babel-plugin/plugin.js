@@ -192,11 +192,11 @@ module.exports = function (api) {
           let relPath = path.relative(state.cwd, state.filename);
           filePath = relPath;
 
-          canHaveMethods = relPath.includes('/methods/');
-          canHavePublications = relPath.includes('/publications/');
+          canHaveMethods = relPath.includes('/methods/') || relPath.startsWith('methods/');
+          canHavePublications = relPath.includes('/publications/') || relPath.startsWith('publications/');
 
           isServer = caller.arch.startsWith('os.');
-          
+
           if (!canHaveMethods && !canHavePublications) {
             return;
           }
