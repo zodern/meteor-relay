@@ -196,6 +196,10 @@ module.exports = function (api) {
           canHavePublications = relPath.includes('/publications/');
 
           isServer = caller.arch.startsWith('os.');
+          
+          if (!canHaveMethods && !canHavePublications) {
+            return;
+          }
         },
         exit(path) {
           if (isServer || !canHaveMethods && !canHavePublications) {
