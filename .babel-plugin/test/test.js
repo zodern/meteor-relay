@@ -27,6 +27,8 @@ describe('Plugin', () => {
 
       }
 
+      export class A {}
+
       let h = true;
       export { h };
     `;
