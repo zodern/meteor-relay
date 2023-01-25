@@ -372,6 +372,10 @@ module.exports = function (api) {
           return;
         }
 
+        if (declaration.type == 'ClassDeclaration') {
+          return;
+        }
+
         if (declaration.type !== 'VariableDeclaration') {
           throw new Error(`export declarations of type ${declaration.type} are not supported`);
         }
