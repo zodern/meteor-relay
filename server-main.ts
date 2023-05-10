@@ -4,6 +4,8 @@ import { Meteor } from 'meteor/meteor';
 import type { CreateMethodPipeline, CreatePubPipeline, PipelineContext, SubscriptionCallbacks } from './types'
 import { createReactiveCursorPublisher, flattenPipeline, isThenable, partialPipeline, Subscribe, withCursors } from './pipeline-helpers';
 
+export type { PipelineContext };
+
 export { partialPipeline, withCursors };
 
 let globalMethodPipeline: any[] = [];
