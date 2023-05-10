@@ -1,4 +1,6 @@
 import { PipelineContext } from './types';
+import type { Meteor, Subscription } from 'meteor/meteor';
+import type { Mongo } from 'meteor/mongo';
 
 type Step<I, R> = (this: Subscription | Meteor.MethodThisType, input: I, context: PipelineContext<unknown>) => R
 

@@ -1,5 +1,6 @@
 import type * as z from "zod";
 import type { Subscription } from 'meteor/meteor';
+import { Meteor } from 'meteor/meteor';
 import type { CreateMethodPipeline, CreatePubPipeline, PipelineContext, SubscriptionCallbacks } from './types'
 import { createReactiveCursorPublisher, flattenPipeline, isThenable, partialPipeline, Subscribe, withCursors } from './pipeline-helpers';
 

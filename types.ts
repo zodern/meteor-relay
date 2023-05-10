@@ -1,4 +1,4 @@
-import type { Subscription } from 'meteor/meteor';
+import type { Subscription, Meteor } from 'meteor/meteor';
 
 export interface SubscriptionCallbacks {
   onStop?: (err?: any) => void,
