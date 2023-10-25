@@ -189,7 +189,10 @@ module.exports = function (api) {
           methods = [];
           publications = [];
 
-          let relPath = path.relative(state.cwd, state.filename);
+          let relPath = path
+            .relative(state.cwd, state.filename)
+            .split(path.sep)
+            .join(path.posix.sep);
           filePath = relPath;
 
           canHaveMethods = relPath.includes('/methods/') || relPath.startsWith('methods/');
