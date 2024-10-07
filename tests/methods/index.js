@@ -1,6 +1,7 @@
 const { z } = require('zod');
 import { createMethod, partialPipeline, setGlobalMethodPipeline } from 'meteor/zodern:relay';
 import assert from 'assert';
+import { insert, remove, update } from '../test-helpers';
 
 export const test1 = createMethod({
   name: 'test1',
@@ -193,12 +194,14 @@ export const stubMethod = createMethod({
 export const Numbers = new Mongo.Collection('numbers');
 export const Selected = new Mongo.Collection('selected');
 
-Numbers.remove({});
-Selected.remove({});
+Meteor.startup(async () => {
+  await remove(Numbers, {});
+  await remove(Selected, {});
 
-for(let i = 0; i < 100; i++) {
-  Numbers.insert({ num: i });
-}
+  for(let i = 0; i < 100; i++) {
+    await insert(Numbers, { num: i });
+  }
+});
 
 let events = [];
 
@@ -222,7 +225,7 @@ export const addSelected = createMethod({
   name: 'addSelected',
   schema: z.number(),
   run(num) {
-    return Selected.insert({
+    return insert(Selected, {
       _id: num.toString(),
       num
     });
@@ -233,9 +236,7 @@ export const removeSelected = createMethod({
   name: 'removeSelected',
   schema: z.string(),
   run(id) {
-    return Selected.remove({
-      _id: id
-    });
+    return remove(Selected, { _id: id });
   }
 });
 
@@ -243,9 +244,6 @@ export const updateSelected = createMethod({
   name: 'updateSelected',
   schema: z.object({ id: z.string(), num: z.number() }),
   run({ id, num }) {
-    return Selected.update(
-      { _id: id },
-      { $set: { num } }
-    );
+    return update(Selected, { _id: id}, { $set: { num }});
   }
 });

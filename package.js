@@ -12,7 +12,7 @@ Package.describe({
 
 Package.onUse(function(api) {
   api.versionsFrom('2.2');
-  api.use('typescript');
+  api.use('typescript@4.2.2||5.0.0');
   api.use('ddp-rate-limiter');
   api.use('zodern:types@1.0.9');
   api.mainModule('server-main.ts', 'server');

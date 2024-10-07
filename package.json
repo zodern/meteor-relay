@@ -10,7 +10,8 @@
   },
   "scripts": {
     "check-types": "npm install && tsc && tsd ./tests",
-    "postcheck-types": "npm prune --prod"
+    "postcheck-types": "npm prune --prod",
+    "postinstall": "node .scripts/clean-deps.js"
   },
   "license": "MIT"
 }

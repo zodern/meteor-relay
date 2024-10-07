@@ -157,8 +157,10 @@ export const reactiveSubscribe = createPublication({
   name: 'reactivePub',
   schema: z.undefined(),
 }).pipeline(
-  () => {
-    Selected.remove({});
+  async () => {
+    Meteor.isFibersDisabled ?
+      await Selected.removeAsync({})
+      : Selected.remove({});
     resetEvents();
   },
   () => {

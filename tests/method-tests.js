@@ -67,16 +67,18 @@ if (Meteor.isClient) {
   });
 }
 
-Tinytest.addAsync('methods - async block by default', async (test) => {
-  let order = [];
+if (Meteor.isClient) {
+  Tinytest.addAsync('methods - async block by default', async (test) => {
+    let order = [];
 
-  await Promise.all([
-    wait100().then(() => order.push('wait100')),
-    fastMethod().then(() => order.push('fastMethod'))
-  ]);
+    await Promise.all([
+      wait100().then(() => order.push('wait100')),
+      fastMethod().then(() => order.push('fastMethod'))
+    ]);
 
-  test.equal(order, ['wait100', 'fastMethod']);
-});
+    test.equal(order, ['wait100', 'fastMethod']);
+  });
+  }
 
 if (Meteor.isClient) {
   Tinytest.add('methods - error if created on client', (test) => {
