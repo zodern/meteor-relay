@@ -4,6 +4,8 @@ import { Meteor } from 'meteor/meteor';
 import type { CreateMethodPipeline, CreatePubPipeline, PipelineContext, SubscriptionCallbacks } from './types'
 import { createReactiveCursorPublisher, flattenPipeline, isThenable, partialPipeline, Subscribe, withCursors } from './pipeline-helpers';
 
+const FIBERS_DISABLED = (Meteor as any).isFibersDisabled;
+
 export type { PipelineContext };
 
 export { partialPipeline, withCursors };
@@ -66,7 +68,7 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
   let name = config.name;
 
   Meteor.methods({
-    [name](data) {
+    async [name](data) {
       if (pipeline.length === 0) {
         throw new Error(`Pipeline or run function for ${name} never configured`);
       }
@@ -108,7 +110,12 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
       }
 
       try {
-        let result = (Promise as any).await(run());
+        let result: any;
+        if (FIBERS_DISABLED) {
+          result = await run();
+        } else {
+          result = (Promise as any).await(run());
+        }
 
         onResult.forEach(callback => {
           callback(result);
@@ -180,7 +187,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
   let name = config.name;
 
-  Meteor.publish(name, function (data: z.input<S>) {
+  Meteor.publish(name, async function (data: z.input<S>) {
     if (pipeline.length === 0) {
       throw new Error(`Pipeline or run function never configured for ${name} publication`);
     }
@@ -331,7 +338,12 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     }
 
     try {
-      const result = (Promise as any).await(run(0, parsed));
+      let result: any;
+      if (FIBERS_DISABLED) {
+        result = await run(0, parsed);
+      } else {
+        result = (Promise as any).await(run(0, parsed));
+      }
 
       onResult.forEach(cb => {
         cb(result.output);
