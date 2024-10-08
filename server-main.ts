@@ -191,13 +191,21 @@ export function createPublication<S extends z.ZodTypeAny, T>(
   let name = config.name;
 
   Meteor.publish(name, async function (data: z.input<S>) {
+    if (FIBERS_DISABLED) {
+      return publisher(this, data);
+    }
+
+    return (Promise as any).await(publisher(this, data));
+  });
+
+  async function publisher (subscription: Subscription, data: z.input<S>) {
     if (pipeline.length === 0) {
       throw new Error(`Pipeline or run function never configured for ${name} publication`);
     }
 
     let fullPipeline = [...globalPublicationPipeline, ...pipeline];
 
-    let self = this;
+    let self = subscription;
     let parsed: z.output<S> = config.schema.parse(data);
     let stopPipelineSubscriptions: (() => void)[] = [];
 
@@ -207,7 +215,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     let isRunning = false;
     let pipelineStopped = false;
 
-    this.onStop(() => {
+    subscription.onStop(() => {
       pipelineStopped = true;
       stop();
     });
@@ -341,12 +349,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
     }
 
     try {
-      let result: any;
-      if (FIBERS_DISABLED) {
-        result = await run(0, parsed);
-      } else {
-        result = (Promise as any).await(run(0, parsed));
-      }
+      let result = await run(0, parsed);
 
       onResult.forEach(cb => {
         cb(result.output);
@@ -360,7 +363,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
       throw error;
     }
-  });
+  };
 
   if (config.rateLimit) {
     if (name === null) {
