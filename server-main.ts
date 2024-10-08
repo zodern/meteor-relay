@@ -190,7 +190,7 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
   let name = config.name;
 
-  Meteor.publish(name, async function (data: z.input<S>) {
+  Meteor.publish(name, function (data: z.input<S>) {
     if (FIBERS_DISABLED) {
       return publisher(this, data);
     }
@@ -350,6 +350,14 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
     try {
       let result = await run(0, parsed);
+
+      if (result === undefined) {
+        if (pipelineStopped) {
+          return;
+        }
+        
+        throw new Error(`zodern:relay Pipeline unexpectedly stopped early.`);
+      }
 
       onResult.forEach(cb => {
         cb(result.output);
