@@ -67,68 +67,71 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
 
   let name = config.name;
 
-  Meteor.methods({
-    async [name](data) {
-      if (pipeline.length === 0) {
-        throw new Error(`Pipeline or run function for ${name} never configured`);
+  async function methodHandler (methodContext: Meteor.MethodThisType, data: any) {
+    if (pipeline.length === 0) {
+      throw new Error(`Pipeline or run function for ${name} never configured`);
+    }
+
+    let onResult: ((value: any) => void)[] = [];
+    let onError: ((err: any) => any)[] = [];
+
+    let self = methodContext;
+    let parsed: z.output<S> = config.schema.parse(data);
+
+    let context: PipelineContext<z.output<S>> = {
+      originalInput: parsed,
+      type: 'method',
+      name,
+      onResult(callback: (result: any) => void) {
+        onResult.push(callback);
+      },
+      onError(callback: (error: any) => any) {
+        onError.push(callback);
+      },
+      stop() {
+        // TODO: support stop in methods
+        throw new Error('stop should not be called in methods');
       }
+    }
 
-      let onResult: ((value: any) => void)[] = [];
-      let onError: ((err: any) => any)[] = [];
+    async function run() {
+      let input: any = parsed;
+      let fullPipeline = [...globalMethodPipeline, ...pipeline];
 
-      let self = this;
-      let parsed: z.output<S> = config.schema.parse(data);
-
-      let context: PipelineContext<z.output<S>> = {
-        originalInput: parsed,
-        type: 'method',
-        name,
-        onResult(callback: (result: any) => void) {
-          onResult.push(callback);
-        },
-        onError(callback: (error: any) => any) {
-          onError.push(callback);
-        },
-        stop() {
-          // TODO: support stop in methods
-          throw new Error('stop should not be called in methods');
+      for (const func of fullPipeline) {
+        input = func.call(self, input, context);
+        if (isThenable(input)) {
+          input = await input;
         }
       }
 
-      async function run() {
-        let input: any = parsed;
-        let fullPipeline = [...globalMethodPipeline, ...pipeline];
+      return input;
+    }
 
-        for (const func of fullPipeline) {
-          input = func.call(self, input, context);
-          if (isThenable(input)) {
-            input = await input;
-          }
-        }
+    try {
+      let result = await run();
 
-        return input;
-      }
+      onResult.forEach(callback => {
+        callback(result);
+      });
 
-      try {
-        let result: any;
-        if (FIBERS_DISABLED) {
-          result = await run();
-        } else {
-          result = (Promise as any).await(run());
-        }
-
-        onResult.forEach(callback => {
-          callback(result);
-        });
-
-        return result;
-      } catch (error) {
-        error = onError.reduce((err, callback) => {
+      return result;
+    } catch (error) {
+      error = onError.reduce((err, callback) => {
           return callback(err) ?? err;
         }, error);
 
         throw error;
       }
+  };
+
+  Meteor.methods({
+    [name](data) {
+      if (FIBERS_DISABLED) {
+        return methodHandler(this, data);
+      }
+
+      return (Promise as any).await(methodHandler(this, data));
     }
   });
 
