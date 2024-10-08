@@ -1,6 +1,9 @@
 import { PipelineContext } from './types';
-import type { Meteor, Subscription } from 'meteor/meteor';
+import { Meteor } from 'meteor/meteor';
+import type { Subscription } from 'meteor/meteor';
 import type { Mongo } from 'meteor/mongo';
+
+const FIBERS_DISABLED = (Meteor as any).isFibersDisabled;
 
 type Step<I, R> = (this: Subscription | Meteor.MethodThisType, input: I, context: PipelineContext<unknown>) => R
 
@@ -41,8 +44,8 @@ export function isThenable(possiblePromise: any): possiblePromise is Promise<any
   return possiblePromise && typeof possiblePromise.then === 'function';
 }
 
-export function withCursors<I extends object, T extends Record<string, Mongo.Cursor<any>>>(input: I, cursors: T):
-  I & { [K in keyof T]: T[K] extends Mongo.Cursor<infer X> ? X[] : never } {
+export async function withCursors<I extends object, T extends Record<string, Mongo.Cursor<any>>>(input: I, cursors: T):
+  Promise<I & { [K in keyof T]: T[K] extends Mongo.Cursor<infer X> ? X[] : never }> {
   let hasUpdate = false;
   let updateInput = () => { hasUpdate = true };
   let handles: Meteor.LiveQueryHandle[] = [];
@@ -79,11 +82,22 @@ export function withCursors<I extends object, T extends Record<string, Mongo.Cur
       }
     });
 
-    initialAdd = false;
+    if (FIBERS_DISABLED) {
+      (handle as any as Promise<Meteor.LiveQueryHandle>).then(() => {
+        initialAdd = false;
+      })
+    } else {
+      initialAdd = false;
+    }
+
     handles.push(handle);
 
     return result;
   }, {});
+
+  if (FIBERS_DISABLED) {
+    handles = await Promise.all(handles);
+  }
 
   function createOutput() {
     return Object.assign({}, input, docs);
@@ -111,7 +125,7 @@ export function createReactiveCursorPublisher(sub: Subscription) {
     [key: string]: Map<string, any>
   } = Object.create(null);
 
-  function updateCursors(cursors: Mongo.Cursor<any> []) {
+  async function updateCursors(cursors: Mongo.Cursor<any> []) {
     handles.forEach(handle => handle.stop());
 
     // Make sure no more than one per collection
@@ -130,7 +144,7 @@ export function createReactiveCursorPublisher(sub: Subscription) {
 
     // TODO: check if the cursors changed. If a cursor is the same, we could
     // reuse the old handle
-    cursors.forEach(cursor => {
+    let promises = cursors.map(async cursor => {
       let coll = (cursor as any)._cursorDescription.collectionName;
 
       let previousData = previouslyPublished[coll] || new Map();
@@ -169,6 +183,10 @@ export function createReactiveCursorPublisher(sub: Subscription) {
         }
       });
 
+      if (FIBERS_DISABLED) {
+        handle = await handle;
+      }
+
       // Remove docs that are no longer found by the new cursor
       for (const id of previousData.keys()) {
         sub.removed(coll, id);
@@ -176,6 +194,8 @@ export function createReactiveCursorPublisher(sub: Subscription) {
 
       handles.push(handle);
     });
+
+    await Promise.all(promises);
 
     Object.entries(previouslyPublished).forEach(([ coll, docs]) => {
       for (const id of docs.keys()) {

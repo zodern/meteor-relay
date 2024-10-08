@@ -323,9 +323,9 @@ export function createPublication<S extends z.ZodTypeAny, T>(
 
         // Meteor checks for _publishedCursor to identify cursors
         if (output && !Array.isArray(output) && output._publishCursor) {
-          reactivePublisher.updateCursors([output]);
+          await reactivePublisher.updateCursors([output]);
         } else if (Array.isArray(output) && output.every(c => c._publishCursor)) {
-          reactivePublisher.updateCursors(output);
+          await reactivePublisher.updateCursors(output);
         }
       } else {
         forwardOutput = true;
