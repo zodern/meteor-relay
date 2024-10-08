@@ -1,0 +1,24 @@
+name: Test Babel Plugin
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '20.x'
+
+      - name: Install Dependencies
+        run: |
+          cd .babel-plugin
+          npm install
+
+      - name: Test
+        run: |
+          cd .babel-plugin
+          npm test
