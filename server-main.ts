@@ -360,7 +360,9 @@ export function createPublication<S extends z.ZodTypeAny, T>(
       }
 
       onResult.forEach(cb => {
-        cb(result.output);
+        // We already verified result above. Older versions of typescript
+        // need us to tell it result is not undefined.
+        cb(result!.output);
       });
 
       return result.forwardOutput ? result.output : undefined;

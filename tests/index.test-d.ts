@@ -111,12 +111,12 @@ const undefinedPipeline = createMethod({
 
 const stubMethod = createMethod({
   name: 'test4',
-  schema: z.undefined(),
-  // stub() {
-  //   return 10 / 2
-  // },
-  run() {
-    return 5;
+  schema: z.number(),
+  stub(num) {
+    return num / 2
+  },
+  run(num) {
+    return num;
   }
 });
 
