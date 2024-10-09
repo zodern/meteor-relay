@@ -39,7 +39,7 @@ export function createMethod <S extends z.ZodTypeAny, T > (
     rateLimit ?: { interval: number, limit: number },
     stub?: boolean | ((this: Meteor.MethodThisType, args: z.output<S>) => any),
     run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
-): (...args: S extends z.ZodUndefined ? [] : [z.input<S>]) => Promise<T>
+): (...args: S extends z.ZodUndefined ? [] : [z.input<S>]) => Promise<Awaited<T>>
 export function createMethod <S extends z.ZodTypeAny>(
   config: { name?: string, schema: S, rateLimit ?: { interval: number, limit: number } }
 ) : { pipeline: CreateMethodPipeline<z.output<S>> }

@@ -56,6 +56,15 @@ const asyncPipeline = createMethod({
   (i) => i / 2
 );
 
+const endingAsyncPipeline = createMethod({
+  name: 'test50',
+  schema: z.number()
+}).pipeline(
+  async (i) => i + 5,
+  (i) => i - 1,
+  async (i) => i / 2
+);
+
 const partial = partialPipeline(
   <I extends { a: number }>({ a }: I) => a,
   (i) => i / 2,
@@ -129,6 +138,14 @@ const stubMethod2 = createMethod({
   }
 });
 
+const asyncMethod = createMethod({
+  name: 'test9',
+  schema: z.undefined(),
+  async run() {
+    return 5;
+  }
+});
+
 expectType<Promise<number>>(undefinedMethod());
 expectError(undefinedMethod(5));
 
@@ -158,11 +175,14 @@ expectType<Promise<number>>(pipelineMethod(20));
 expectError(pipelineMethod('5'));
 
 expectType<Promise<number>>(asyncPipeline(20));
+expectType<Promise<number>>(endingAsyncPipeline(20));
 
 expectType<number>(partial({ a: 5 }));
 expectError(partial({ a: 'a' }));
 
 expectType<number>(partialAsync({ a: 5 }));
+
+expectType<Promise<number>>(asyncMethod());
 
 expectType<(s: string) => Promise<string | null>>(createMethod({
   name: 'fun',
