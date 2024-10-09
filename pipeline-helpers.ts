@@ -127,6 +127,7 @@ export function createReactiveCursorPublisher(sub: Subscription) {
 
   async function updateCursors(cursors: Mongo.Cursor<any> []) {
     handles.forEach(handle => handle.stop());
+    handles.length = 0;
 
     // Make sure no more than one per collection
     let colls = new Set();
