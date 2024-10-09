@@ -26,7 +26,7 @@ export interface CreateMethodPipeline<I, This = Meteor.MethodThisType> {
 }
 
 export interface CreatePubPipeline<I, This = Subscription> {
-  <R1>(step1: (this: This, input: I, context: PipelineContext<I>) => R1): (...args: I extends undefined ? [] : [I]) => Promise<R1>;
+  <R1>(step1: (this: This, input: I, context: PipelineContext<I>) => R1): (...args: I extends undefined ? [SubscriptionCallbacks?] : [I, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle;
   <R1, R2>(step1: (this: This, input: I, context: PipelineContext<I>) => R1, step2: (this: This, input: Awaited<R1>, context: PipelineContext<I>) => R2,): (...args: I extends undefined ? [SubscriptionCallbacks?] : [I, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle
   <R1, R2, R3>(step1: (this: This, input: I, context: PipelineContext<I>) => R1, step2: (this: This, input: Awaited<R1>, context: PipelineContext<I>) => R2, step3: (this: This, input: Awaited<R2>, context: PipelineContext<I>) => R3): (...args: I extends undefined ? [SubscriptionCallbacks?] : [I, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle;
   <R1, R2, R3, R4>(step1: (this: This, input: I, context: PipelineContext<I>) => R1, step2: (this: This, input: Awaited<R1>, context: PipelineContext<I>) => R2, step3: (this: This, input: Awaited<R2>, context: PipelineContext<I>) => R3, step4: (this: This, input: Awaited<R3>, context: PipelineContext<I>) => R4): (...args: I extends undefined ? [SubscriptionCallbacks?] : [I, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle;

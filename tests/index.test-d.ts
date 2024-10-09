@@ -289,16 +289,29 @@ expectType<Meteor.SubscriptionHandle>(undefinedSubscribe({
 
 expectType<Meteor.SubscriptionHandle>(stringSubscribe('fun3', {}));
 
-expectType<Meteor.SubscriptionHandle>(createPublication({
+const pipelineSubscribe = createPublication({
   name: 'fun',
   schema: z.string()
 }).pipeline(
-  (input, context) => context.name,
+  (input, context) => 'test',
   (input, context) => {
     context.onError((err: any) => new Error('test'));
     context.onResult((result: any) => console.log(result));
     context.type.substring(0, 5);
 
-    return input;
+    input.toUpperCase();
   }
-)('test'));
+);
+
+const singleStepSubscribe = createPublication({
+  name: 'fun',
+  schema: z.string()
+}).pipeline(
+  (input, context) => input
+);
+
+expectType<Meteor.SubscriptionHandle>(pipelineSubscribe('test'));
+expectType<Meteor.SubscriptionHandle>(singleStepSubscribe('test'));
+expectType<Meteor.SubscriptionHandle>(singleStepSubscribe('test', {
+  onStop(err) {}
+}));

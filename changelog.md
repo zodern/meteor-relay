@@ -5,9 +5,10 @@ This is the changelog for the `zodern:relay` Meteor package.
 
 - Breaking change: `withCursors` now returns a promise. If you use `withCursors` as documented, you do not need to do anything. This only affects apps that directly use the returned value.
 - Add support for Meteor 3. Meteor 2.2 and newer is still supported
-- Fix types for async methods or method pipelines so the returned value does not wrap the promise multiple times (now it is Promise<5> instead of Promise<Promise<5>>)
 - Improve names of the arguments for calling a method or subscribing to a publication (for example, `input` instead of `argv_0`)
-- Fix small memory leak with reactive publications
+- Fix types for async methods or method pipelines so the returned value does not wrap the promise multiple times (now it is Promise<5> instead of Promise<Promise<5>>)
+- Fix types for publication pipelines with only one step
+- Fix small memory leak with reactive publications when the last step returned cursor(s) to publish
 - Fix possible error for unblocked reactive publications if they are stopped before they are ready
 
 ## 1.1.1 - May 10, 2023
