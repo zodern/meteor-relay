@@ -2,6 +2,8 @@
 
 zodern:relay allows you to easily write methods and publications, and have typescript check the types of the args and result wherever you call the method or subscribe to a publication.
 
+Compatible with Meteor 2.2 - 3
+
 #### /imports/methods/projects.ts:
 ```ts
 import { createMethod } from 'meteor/zodern:relay';
