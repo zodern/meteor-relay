@@ -433,7 +433,7 @@ export const createTask = createMethod({
 });
 ```
 
-To use a different method for the stub, configure it using the `stop` property:
+To use a different method for the stub, configure it using the `stub` property:
 
 ```ts
 import { Tasks, Events } from '/collections';
