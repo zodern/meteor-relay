@@ -39,7 +39,7 @@ export function createMethod <S extends z.ZodTypeAny, T > (
     rateLimit ?: { interval: number, limit: number },
     stub?: boolean | ((this: Meteor.MethodThisType, args: z.output<S>) => any),
     run: (this: Meteor.MethodThisType, args: z.output<S>) => T }
-): (...args: S extends z.ZodUndefined ? [] : [z.input<S>]) => Promise<Awaited<T>>
+): (...args: S extends z.ZodUndefined ? [] : [input: z.input<S>]) => Promise<Awaited<T>>
 export function createMethod <S extends z.ZodTypeAny>(
   config: { name?: string, schema: S, rateLimit ?: { interval: number, limit: number } }
 ) : { pipeline: CreateMethodPipeline<z.output<S>> }
@@ -171,7 +171,7 @@ export function createMethod<S extends z.ZodUndefined | z.ZodTypeAny, T>(config:
   };
 }
 
-export function createPublication<S extends z.ZodTypeAny, T>(config: { name?: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run: (this: Subscription, args: z.output<S>) => T }): (...args: z.output<S> extends undefined ? [SubscriptionCallbacks?] : [z.output<S>, SubscriptionCallbacks?]) => Meteor.SubscriptionHandle
+export function createPublication<S extends z.ZodTypeAny, T>(config: { name?: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run: (this: Subscription, args: z.output<S>) => T }): (...args: z.output<S> extends undefined ? [callbacks?: SubscriptionCallbacks] : [input: z.output<S>, callbacks?: SubscriptionCallbacks]) => Meteor.SubscriptionHandle
 export function createPublication<S extends z.ZodTypeAny, R1,> (config: { name?: string | null, schema: S, rateLimit ?: { interval: number, limit: number } }): { pipeline: CreatePubPipeline<z.output<S>> }
 export function createPublication<S extends z.ZodTypeAny, T>(
   config: { name?: string | null, schema: S, rateLimit?: { interval: number, limit: number }, run?: ((this: Subscription, args: z.output<S>) => T) }
